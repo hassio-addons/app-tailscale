@@ -514,3 +514,5 @@ SOFTWARE.
 [tailscale_info_tags]: https://tailscale.com/kb/1068/tags
 [tailscale_info_taildrop]: https://tailscale.com/kb/1106/taildrop
 [tailscale_info_userspace_networking]: https://tailscale.com/kb/1112/userspace-networking
+[tailscale_info_taildrive]: https://tailscale.com/kb/1369/taildrive
+[tailscale_info_taildrop]: https://tailscale.com/kb/1106/taildrop

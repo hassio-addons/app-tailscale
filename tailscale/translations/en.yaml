@@ -94,6 +94,12 @@ configuration:
       This option allows you to enable Taildrop, a file sharing service
       that allows you to share files with other Tailscale nodes.
       When not set, this option is enabled by default.
+  taildrive:
+    name: Taildrive Shares
+    description: >-
+      This option allows you to specify which Home Assistant directories you
+      want to share with other Tailscale nodes using Taildrive.
+      The listed values are the only allowed values.
   userspace_networking:
     name: Userspace networking mode
     description: >-

@@ -5,42 +5,56 @@
 # Exposes Home Assistant directories over Taildrive
 # ==============================================================================
 
-# Read configured directories from the add-on configuration.
-if ! mapfile -t configured_share_names < <(bashio::config "taildrive"); then
-    bashio::exit.nok "Error reading configured directories from add-on configuration."
+# These are not arrays, but newline separated lists (single strings)
+declare all_share_names
+declare configured_share_names
+declare active_share_names
+
+declare share_name
+
+# Check if Taildrive is available
+if ! /opt/tailscale status --self=true --peers=false --json \
+  | jq -rce '.Self.CapMap | has("drive:share")' > /dev/null;
+then
+  bashio::exit.nok "Tailscale's Taildrive is disabled"
+fi
+
+# Read all possible and configured directories from the add-on configuration.
+if ! all_share_names=$(bashio::config 'taildrive' | jq -rc 'keys_unsorted[]') || \
+  ! configured_share_names=$(bashio::config 'taildrive' | jq -rc 'to_entries[] | select(.value) | .key')
+then
+  bashio::exit.nok "Error reading configured Taildrive directories from add-on configuration."
 fi
 
 # Read currently shared directories into an array from tailscale drive list.
 # The output of which looks like:
-# name    path    as
-# ----    ----    --
-# config  /config  config
-if ! mapfile -t active_share_names < <(/opt/tailscale drive list | tail -n +3 | awk '{print $1}'); then
-    bashio::exit.nok "Error reading shared directories from Tailscale."
+# name      path       as
+# ------    -------    ----
+# config    /config    root
+if ! active_share_names=$(/opt/tailscale drive list | tail -n +3 | awk '{print $1}'); then
+  bashio::exit.nok "Error reading shared Taildrive directories from Tailscale."
 fi
 
-# If a directory is configured but not shared, share it.
-for share_name in "${configured_share_names[@]}"; do
-    if ! printf '%s\0' "${active_share_names[@]}" | grep -Fxqz -- "${share_name}"; then
-        # Rewrite homeasstant_config to config
-        if [[ "${share_name}" == "homeassistant_config" ]]; then
-            share_name="config"
-        fi
+ln -s "/homeassistant" "/config"
 
-        # Share the directory
-        /opt/tailscale drive share "${share_name}" "/${share_name}"
-    fi
+# If a directory is configured but not shared, share it.
+for share_name in ${configured_share_names}; do
+  if ! grep -Fxq -- "${share_name}" <<< "${active_share_names}"; then
+    bashio::log.info "Taildrive: sharing /${share_name}"
+    /opt/tailscale drive share "${share_name}" "/${share_name}"
+  else
+    bashio::log.info "Taildrive: /${share_name} is already shared"
+  fi
 done
 
-# If a directory is shared but not configured, unshare it.
-for share_name in "${active_share_names[@]}"; do
-    if ! printf '%s\0' "${configured_share_names[@]}" | grep -Fxqz -- "${share_name}"; then
-        # Rewrite homeasstant_config to config
-        if [[ "${share_name}" == "homeassistant_config" ]]; then
-            share_name="config"
-        fi
-
-        # Unshare the directory
-        /opt/taildrive drive unshare "${share_name}"
+# If a directory is shared but not configured, and managed by this add-on, unshare it.
+for share_name in ${active_share_names}; do
+  if ! grep -Fxq -- "${share_name}" <<< "${configured_share_names}"; then
+    if grep -Fxq -- "${share_name}" <<< "${all_share_names}"; then
+      bashio::log.info "Taildrive: unsharing /${share_name}"
+      /opt/tailscale drive unshare "${share_name}"
+    else
+      bashio::log.info "Taildrive: skipping to unshare '${share_name}'"
     fi
+  fi
 done

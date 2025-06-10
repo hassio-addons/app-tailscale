@@ -74,6 +74,14 @@ stateful_filtering: false
 tags:
   - tag:example
   - tag:homeassistant
+taildrive:
+  addons: false
+  addon_configs: false
+  backup: false
+  config: false
+  media: false
+  share: false
+  ssl: false
 taildrop: true
 userspace_networking: true
 ```
@@ -325,6 +333,15 @@ They need to start with `tag:`.
 
 More information: [Tags][tailscale_info_tags]
 
+### Option: `taildrive`
+
+This option allows you to specify which Home Assistant directories you want to
+share with other Tailscale nodes using Taildrive.
+
+Only the listed directories are available.
+
+More information: [Taildrive][tailscale_info_taildrive]
+
 ### Option: `taildrop`
 
 This app supports [Tailscale's Taildrop][tailscale_info_taildrop] feature,
@@ -512,6 +529,7 @@ SOFTWARE.
 [tailscale_info_site_to_site]: https://tailscale.com/kb/1214/site-to-site
 [tailscale_info_subnets]: https://tailscale.com/kb/1019/subnets
 [tailscale_info_tags]: https://tailscale.com/kb/1068/tags
+[tailscale_info_taildrive]: https://tailscale.com/kb/1369/taildrive
 [tailscale_info_taildrop]: https://tailscale.com/kb/1106/taildrop
 [tailscale_info_userspace_networking]: https://tailscale.com/kb/1112/userspace-networking
 [tailscale_info_taildrive]: https://tailscale.com/kb/1369/taildrive

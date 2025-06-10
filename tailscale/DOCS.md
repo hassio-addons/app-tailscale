@@ -83,6 +83,14 @@ stateful_filtering: false
 tags:
   - tag:example
   - tag:homeassistant
+taildrive:
+  addons: false
+  addon_configs: false
+  backup: false
+  config: false
+  media: false
+  share: false
+  ssl: false
 taildrop: true
 userspace_networking: true
 ```
@@ -347,6 +355,15 @@ This option allows you to specify specific tags for this Tailscale instance.
 They need to start with `tag:`.
 
 More information: [Tags][tailscale_info_tags]
+
+### Option: `taildrive`
+
+This option allows you to specify which Home Assistant directories you want to
+share with other Tailscale nodes using Taildrive.
+
+Only the listed directories are available.
+
+More information: [Taildrive][tailscale_info_taildrive]
 
 ### Option: `taildrop`
 

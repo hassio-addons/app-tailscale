@@ -70,4 +70,4 @@ fi
 echo "" >&3
 
 # Set up serve or funnel
-exec /opt/tailscale $(bashio::config 'share_homeassistant') --https=$(bashio::config 'share_on_port' '443') --set-path=/ "http://127.0.0.1:$(bashio::core.port)"
+exec /opt/tailscale $(bashio::config 'share_homeassistant') --https=$(bashio::config 'share_on_port') --set-path=/ "http://127.0.0.1:$(bashio::core.port)"

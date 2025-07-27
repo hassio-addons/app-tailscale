@@ -79,30 +79,25 @@ if bashio::config.true "userspace_networking"; then
 fi
 
 # Disable protect-subnets service when userspace-networking is enabled or accepting routes is disabled
-if ! bashio::config.has_value "userspace_networking" || \
-    bashio::config.true "userspace_networking" || \
+if bashio::config.true "userspace_networking" || \
     bashio::config.false "accept_routes";
 then
     rm /etc/s6-overlay/s6-rc.d/post-tailscaled/dependencies.d/protect-subnets
 fi
 
-# If advertise_routes is configured, do not wait for the local network to be ready to collect subnet information
-if bashio::config.exists "advertise_routes";
+# If local subnets are not configured in advertise_routes, do not wait for the local network to be ready to collect subnet information
+if ! bashio::config "advertise_routes" | grep -Eq "^local.subnets$";
 then
     rm /etc/s6-overlay/s6-rc.d/post-tailscaled/dependencies.d/local-network
 fi
 
 # Disable forwarding service when userspace-networking is enabled
-if ! bashio::config.has_value "userspace_networking" || \
-    bashio::config.true "userspace_networking";
-then
+if bashio::config.true "userspace_networking"; then
     rm /etc/s6-overlay/s6-rc.d/user/contents.d/forwarding
 fi
 
 # Disable mss-clamping service when userspace-networking is enabled
-if ! bashio::config.has_value "userspace_networking" || \
-    bashio::config.true "userspace_networking";
-then
+if bashio::config.true "userspace_networking"; then
     rm /etc/s6-overlay/s6-rc.d/user/contents.d/mss-clamping
 fi
 
@@ -111,9 +106,7 @@ if bashio::config.false 'taildrop'; then
     rm /etc/s6-overlay/s6-rc.d/user/contents.d/taildrop
 fi
 
-# Disable share-homeassistant service when share_homeassistant has not been explicitly enabled
-if ! bashio::config.has_value 'share_homeassistant' || \
-    bashio::config.equals 'share_homeassistant' 'disabled'
-then
+# Disable share-homeassistant service when it has been explicitly disabled
+if bashio::config.equals 'share_homeassistant' 'disabled'; then
     rm /etc/s6-overlay/s6-rc.d/user/contents.d/share-homeassistant
 fi

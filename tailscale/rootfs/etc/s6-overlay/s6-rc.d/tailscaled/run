@@ -28,10 +28,8 @@ if bashio::var.has_value "${udp_port}"; then
   options+=(--port=${udp_port})
 fi
 
-# Use userspace networking by default when not set, or when explicitly enabled
-if ! bashio::config.has_value "userspace_networking" || \
-  bashio::config.true "userspace_networking";
-then
+# Use userspace networking when explicitly enabled
+if bashio::config.true "userspace_networking"; then
   options+=(--tun=userspace-networking)
 fi
 

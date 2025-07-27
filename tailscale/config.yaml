@@ -26,21 +26,37 @@ map:
   - share:rw
 ports:
   41641/udp: null
-schema:
-  accept_dns: bool?
-  accept_routes: bool?
-  advertise_exit_node: bool?
-  advertise_connector: bool?
+options:
+  accept_dns: true
+  accept_routes: true
+  advertise_exit_node: true
+  advertise_connector: true
   advertise_routes:
-    - "match(^(((25[0-5]|(2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(25[0-5]|(2[0-4]|1\\d|[1-9]?)\\d)\\/(3[0-2]|[12]?\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+\\/(12[0-8]|(1[01]|[1-9]?)\\d))$)?"
+    - local_subnets
+  log_level: info
+  login_server: "https://controlplane.tailscale.com"
+  share_homeassistant: disabled
+  share_on_port: 443
+  snat_subnet_routes: true
+  stateful_filtering: false
+  tags: []
+  taildrop: true
+  userspace_networking: true
+schema:
+  accept_dns: bool
+  accept_routes: bool
+  advertise_exit_node: bool
+  advertise_connector: bool
+  advertise_routes:
+    - "match(^(?:local.subnets|(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\/(?:3[0-2]|[12]?\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+\\/(?:12[0-8]|(?:1[01]|[1-9]?)\\d))$)"
   exit_node: "match(^(?:(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+|[a-fA-F\\d]{8}(?:-[a-fA-F\\d]{4}){3}-[a-fA-F\\d]{12}|auto:any)$)?"
-  log_level: list(trace|debug|info|notice|warning|error|fatal)?
-  login_server: url?
-  share_homeassistant: list(disabled|serve|funnel)?
-  share_on_port: match(^(443|8443|10000)$)?
-  snat_subnet_routes: bool?
-  stateful_filtering: bool?
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
+  login_server: url
+  share_homeassistant: list(disabled|serve|funnel)
+  share_on_port: match(^(?:443|8443|10000)$)
+  snat_subnet_routes: bool
+  stateful_filtering: bool
   tags:
-    - "match(^tag:[a-zA-Z][a-zA-Z0-9-]*$)?"
-  taildrop: bool?
-  userspace_networking: bool?
+    - "match(^tag:[a-zA-Z][a-zA-Z0-9-]*$)"
+  taildrop: bool
+  userspace_networking: bool

@@ -25,10 +25,20 @@ if bashio::cache.exists "subnet-routes-$1"; then
   readarray -t routes < <(bashio::cache.get "subnet-routes-$1")
   printf -v response "%s" "${routes[@]/%/$'\n'}"
 else
-  if [[ "$1" == "advertised" ]] && bashio::config.exists "advertise_routes"; then
-    # Configuration exists, use configured values
+  if [[ "$1" == "advertised" ]]; then
+    # Use configured values
     for address in $(bashio::config "advertise_routes"); do
-      addresses+=("${address}")
+      if [[ "${address}" =~ ^local.subnets$ ]]; then
+        # Handle special value, collect local subnets
+        readarray -t routes < <(subnet-routes local)
+        if (( 0 == ${#routes[@]} )); then
+          bashio::log.warning \
+            "There are no local subnets to advertise!" \
+            "Restart of the add-on is required after the issue is fixed!"
+        fi
+      else
+        addresses+=("${address}")
+      fi
     done
   else
     # Find interfaces and matching addresses from which we can extract routes
@@ -38,7 +48,7 @@ else
     done
   fi
 
-  # Extract routes
+  # Extract routes from addresses
   for address in "${addresses[@]}"; do
     if bashio::var.has_value "${address}"; then
       # Skip local link addresses
@@ -60,20 +70,11 @@ else
     fi
   done
 
-  # Remove duplicate entries
+  # Remove duplicate entries from routes
   readarray -t routes < <(printf "%s" "${routes[@]/%/$'\n'}" | sort -u)
 
   printf -v response "%s" "${routes[@]/%/$'\n'}"
   bashio::cache.set "subnet-routes-$1" "${response}"
-fi
-
-if (( 0 == ${#routes[@]} )) && \
-  [[ "$1" == "advertised" ]] && \
-  ! bashio::config.exists "advertise_routes"
-then
-  bashio::log.warning \
-    "There are no local subnets to advertise!" \
-    "Restart of the app is required after the issue is fixed!"
 fi
 
 printf "%s" "${response}"

@@ -17,36 +17,29 @@ declare keyexpiry
 # Default options
 options+=(--hostname "$(bashio::info.hostname)")
 
-# Accept magicDNS by default when not set, or when explicitly enabled
-if ! bashio::config.has_value "accept_dns" || \
-  bashio::config.true "accept_dns";
-then
+# Accept magicDNS when explicitly enabled
+if bashio::config.true "accept_dns"; then
   options+=(--accept-dns)
 else
   options+=(--accept-dns=false)
 fi
 
-# Accept routes by default when not set, or when explicitly enabled
-if ! bashio::config.has_value "accept_routes" || \
-  bashio::config.true "accept_routes";
-then
+# Accept routes when explicitly enabled
+if bashio::config.true "accept_routes"; then
   options+=(--accept-routes)
 else
   options+=(--accept-routes=false)
 fi
 
 # Check exit node configuration
-if (! bashio::config.has_value "advertise_exit_node" || \
-  bashio::config.true "advertise_exit_node") && \
+if bashio::config.true "advertise_exit_node" && \
   bashio::config.has_value "exit_node"
 then
   bashio::exit.nok "You can't advertise this device as an exit node and at the same time specify an exit node to use"
 fi
 
-# Advertise as exit node by default when not set, or when explicitly enabled
-if ! bashio::config.has_value "advertise_exit_node" || \
-  bashio::config.true "advertise_exit_node";
-then
+# Advertise as exit node when explicitly enabled
+if bashio::config.true "advertise_exit_node"; then
   options+=(--advertise-exit-node)
 else
   options+=(--advertise-exit-node=false)
@@ -62,42 +55,33 @@ else
   options+=(--exit-node-allow-lan-access=false)
 fi
 
-# Advertise app connector by default when not set, or when explicitly enabled
-if ! bashio::config.has_value "advertise_connector" || \
-  bashio::config.true "advertise_connector";
-then
+# Advertise app connector when explicitly enabled
+if bashio::config.true "advertise_connector"; then
   options+=(--advertise-connector)
 else
   options+=(--advertise-connector=false)
 fi
 
 # Get configured control server
-if bashio::config.has_value "login_server";
-then
-  login_server=$(bashio::config "login_server")
-  options+=(--login-server="${login_server}")
-fi
+login_server=$(bashio::config "login_server")
+options+=(--login-server="${login_server}")
 
-# Enable stateful filtering (it's disabled by default from v1.66.4)
-if ! bashio::config.has_value "stateful_filtering" || \
-  bashio::config.false "stateful_filtering";
-then
-  options+=(--stateful-filtering=false)
-else
+# Enable stateful filtering when explicitly enabled
+if bashio::config.true "stateful_filtering"; then
   options+=(--stateful-filtering)
+else
+  options+=(--stateful-filtering=false)
 fi
 
-# Support advanced site-to-site networking, disable source addresses NAT
-if ! bashio::config.has_value "snat_subnet_routes" || \
-  bashio::config.true "snat_subnet_routes";
-then
+# Enable source NAT when explicitly enabled
+if bashio::config.true "snat_subnet_routes"; then
   options+=(--snat-subnet-routes)
 else
   options+=(--snat-subnet-routes=false)
 fi
 
 # Get configured tags
-tags=$(bashio::config "tags//[] | join(\",\")" "")
+tags=$(bashio::config "tags | join(\",\")" "")
 options+=(--advertise-tags="${tags}")
 
 # Advertise subnet routes
@@ -162,8 +146,7 @@ fi
 
 # Warn about colliding subnet routes if non-userspace networking and accepting routes are enabled
 if bashio::config.false "userspace_networking" && \
-  (! bashio::config.has_value "accept_routes" || \
-    bashio::config.true "accept_routes");
+  bashio::config.true "accept_routes";
 then
   readarray -t colliding_routes < <( \
     comm -1 -2 \
@@ -185,9 +168,7 @@ then
 fi
 
 # Notify about userspace networking
-if ! bashio::config.has_value "userspace_networking" || \
-  bashio::config.true "userspace_networking";
-then
+if bashio::config.true "userspace_networking"; then
   bashio::log.notice \
     "The app uses userspace networking mode."
   bashio::log.notice \

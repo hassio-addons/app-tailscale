@@ -81,7 +81,7 @@ else
 fi
 
 # Get configured tags
-tags=$(bashio::config "tags | join(\",\")" "")
+tags=$(bashio::config "tags | join(\",\")")
 options+=(--advertise-tags="${tags}")
 
 # Advertise subnet routes

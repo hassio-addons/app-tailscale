@@ -44,7 +44,9 @@ else
   for share_name in ${configured_share_names}; do
     if ! grep -Fxq -- "${share_name}" <<< "${active_share_names}"; then
       bashio::log.info "Taildrive: sharing /${share_name}"
-      /opt/tailscale drive share "${share_name}" "/${share_name}"
+      if ! /opt/tailscale drive share "${share_name}" "/${share_name}"; then
+        bashio::exit.nok "Failed to share /${share_name}"
+      fi
     else
       bashio::log.info "Taildrive: /${share_name} is already shared"
     fi
@@ -55,7 +57,9 @@ else
     if ! grep -Fxq -- "${share_name}" <<< "${configured_share_names}"; then
       if grep -Fxq -- "${share_name}" <<< "${all_share_names}"; then
         bashio::log.info "Taildrive: unsharing /${share_name}"
-        /opt/tailscale drive unshare "${share_name}"
+        if ! /opt/tailscale drive unshare "${share_name}"; then
+          bashio::exit.nok "Failed to unshare /${share_name}"
+        fi
       else
         bashio::log.info "Taildrive: skipping to unshare '${share_name}'"
       fi

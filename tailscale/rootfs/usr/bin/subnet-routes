@@ -28,7 +28,7 @@ else
   if [[ "$1" == "advertised" ]]; then
     # Use configured values
     for address in $(bashio::config "advertise_routes"); do
-      if [[ "${address}" =~ ^local.subnets$ ]]; then
+      if [[ "${address}" =~ ^local_subnets$ ]]; then
         # Handle special value, collect local subnets
         readarray -t routes < <(subnet-routes local)
         if (( 0 == ${#routes[@]} )); then

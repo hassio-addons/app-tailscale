@@ -25,7 +25,7 @@ if ! /opt/tailscale status --self=true --peers=false --json \
   | jq -rce '.Self.CapMap | has("drive:share")' > /dev/null;
 then
   # If Taildrive is not available but any share is configured, that is an error
-  if (( 0 < $(wc -w <<< ${configured_share_names}) )); then
+  if (( 0 < $(wc -w <<< "${configured_share_names}") )); then
     bashio::exit.nok "Tailscale's Taildrive is disabled but directories are configured for sharing"
   fi
 else
@@ -41,7 +41,7 @@ else
   ln -s "/homeassistant" "/config"
 
   # If a directory is configured but not shared, share it.
-  for share_name in ${configured_share_names}; do
+  for share_name in "${configured_share_names}"; do
     if ! grep -Fxq -- "${share_name}" <<< "${active_share_names}"; then
       bashio::log.info "Taildrive: sharing /${share_name}"
       if ! /opt/tailscale drive share "${share_name}" "/${share_name}"; then
@@ -53,7 +53,7 @@ else
   done
 
   # If a directory is shared but not configured, and managed by this add-on, unshare it.
-  for share_name in ${active_share_names}; do
+  for share_name in "${active_share_names}"; do
     if ! grep -Fxq -- "${share_name}" <<< "${configured_share_names}"; then
       if grep -Fxq -- "${share_name}" <<< "${all_share_names}"; then
         bashio::log.info "Taildrive: unsharing /${share_name}"

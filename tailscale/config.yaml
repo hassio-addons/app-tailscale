@@ -33,6 +33,7 @@ options:
   advertise_connector: true
   advertise_routes:
     - local_subnets
+  always_use_derp: false
   log_level: info
   login_server: "https://controlplane.tailscale.com"
   share_homeassistant: disabled
@@ -49,6 +50,7 @@ schema:
   advertise_connector: bool
   advertise_routes:
     - "match(^(?:local_subnets|(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\/(?:3[0-2]|[12]?\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+\\/(?:12[0-8]|(?:1[01]|[1-9]?)\\d))$)"
+  always_use_derp: bool
   exit_node: "match(^(?:(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+|[a-fA-F\\d]{8}(?:-[a-fA-F\\d]{4}){3}-[a-fA-F\\d]{12}|auto:any)$)?"
   log_level: list(trace|debug|info|notice|warning|error|fatal)
   login_server: url

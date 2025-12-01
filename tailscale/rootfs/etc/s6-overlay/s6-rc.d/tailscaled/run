@@ -33,6 +33,12 @@ if bashio::config.true "userspace_networking"; then
   options+=(--tun=userspace-networking)
 fi
 
+# If always_use_derp enabled, set TS_DEBUG_ALWAYS_USE_DERP=true
+if bashio::config.true "always_use_derp"; then
+  export TS_DEBUG_ALWAYS_USE_DERP=true
+  bashio::log.notice "You have enabled always_use_derp, all traffic will be routed via DERP servers"
+fi
+
 # Run Tailscale
 # If exists, resolv.dnsmasq.conf pointing to the dummy dnsmasq will be mounted in place of the real resolv.conf only for tailscaled
 # This will prevent the DNS at 100.100.100.100 to call back to hassio_dns causing a loop

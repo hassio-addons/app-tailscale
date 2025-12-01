@@ -34,6 +34,12 @@ configuration:
       your device is connected to) to other clients on your tailnet.
       The app by default will advertise routes to your subnets on all supported
       interfaces by adding `local_subnets` to the list.
+  always_use_derp:
+    name: Alwas use DERP connection
+    description: >-
+      When enabled forces all peer communication over DERP by disabling the use of
+      UDP.
+      This option is disabled by default.
   exit_node:
     name: Use exit node
     description: >-

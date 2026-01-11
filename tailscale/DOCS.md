@@ -363,6 +363,8 @@ share with other Tailscale nodes using Taildrive.
 
 Only the listed directories are available.
 
+These options are disabled by default.
+
 More information: [Taildrive][tailscale_info_taildrive]
 
 ### Option: `taildrop`

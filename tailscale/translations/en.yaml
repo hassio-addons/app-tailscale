@@ -94,6 +94,7 @@ configuration:
       This option allows you to specify which Home Assistant directories you want to
       share with other Tailscale nodes using Taildrive.
       Only the listed directories are available.
+      These options are disabled by default.
   taildrop:
     name: Taildrop
     description: >-

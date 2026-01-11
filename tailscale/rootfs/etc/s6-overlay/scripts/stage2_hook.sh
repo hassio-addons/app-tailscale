@@ -86,8 +86,7 @@ then
 fi
 
 # If local subnets are not configured in advertise_routes, do not wait for the local network to be ready to collect subnet information
-if ! bashio::config "advertise_routes" | grep -Eq "^local_subnets$";
-then
+if ! bashio::config "advertise_routes" | grep -Fxq "local_subnets"; then
     rm /etc/s6-overlay/s6-rc.d/post-tailscaled/dependencies.d/local-network
 fi
 

@@ -41,7 +41,9 @@ else
   ln -s "/homeassistant" "/config"
 
   # If a directory is configured but not shared, share it.
-  for share_name in "${configured_share_names}"; do
+  # Note: do not quote configured_share_names in the for loop,
+  # as we want to iterate over words (lines), this is not an array
+  for share_name in ${configured_share_names}; do
     if ! grep -Fxq -- "${share_name}" <<< "${active_share_names}"; then
       bashio::log.info "Taildrive: sharing /${share_name}"
       if ! /opt/tailscale drive share "${share_name}" "/${share_name}"; then
@@ -53,7 +55,9 @@ else
   done
 
   # If a directory is shared but not configured, and managed by this add-on, unshare it.
-  for share_name in "${active_share_names}"; do
+  # Note: do not quote active_share_names in the for loop,
+  # as we want to iterate over words (lines), this is not an array
+  for share_name in ${active_share_names}; do
     if ! grep -Fxq -- "${share_name}" <<< "${configured_share_names}"; then
       if grep -Fxq -- "${share_name}" <<< "${all_share_names}"; then
         bashio::log.info "Taildrive: unsharing /${share_name}"

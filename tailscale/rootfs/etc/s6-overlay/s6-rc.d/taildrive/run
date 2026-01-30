@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 export LOG_FD
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # Exposes Home Assistant directories over Taildrive
 # ==============================================================================
 
@@ -13,11 +13,11 @@ declare active_share_names
 
 declare share_name
 
-# Read all possible and configured directories from the add-on configuration.
+# Read all possible and configured directories from the app configuration.
 if ! all_share_names=$(bashio::config 'taildrive' | jq -rc 'keys_unsorted[]') || \
   ! configured_share_names=$(bashio::config 'taildrive' | jq -rc 'to_entries[] | select(.value) | .key')
 then
-  bashio::exit.nok "Error reading configured Taildrive directories from add-on configuration."
+  bashio::exit.nok "Error reading configured Taildrive directories from app configuration."
 fi
 
 # Check if Taildrive is available
@@ -54,7 +54,7 @@ else
     fi
   done
 
-  # If a directory is shared but not configured, and managed by this add-on, unshare it.
+  # If a directory is shared but not configured, and managed by this app, unshare it.
   # Note: do not quote active_share_names in the for loop,
   # as we want to iterate over words (lines), this is not an array
   for share_name in ${active_share_names}; do

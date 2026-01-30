@@ -10,13 +10,13 @@ ARG BUILD_ARCH=amd64
 ARG TAILSCALE_VERSION="v1.94.1"
 RUN \
     apk add --no-cache \
-        ethtool=6.14.1-r0 \
-        ipcalc=1.0.3-r0 \
-        iproute2=6.15.0-r0 \
+        ethtool=6.15-r0 \
+        ipcalc=1.0.3-r1 \
+        iproute2=6.17.0-r0 \
         iptables=1.8.11-r1 \
-        nginx=1.28.0-r3 \
-        coreutils=9.7-r1 \
-        networkmanager=1.52.1-r0 \
+        nginx=1.28.0-r8 \
+        coreutils=9.8-r1 \
+        networkmanager=1.54.3-r0 \
     \
     && ln -sf /sbin/xtables-nft-multi /sbin/ip6tables \
     && ln -sf /sbin/xtables-nft-multi /sbin/iptables \

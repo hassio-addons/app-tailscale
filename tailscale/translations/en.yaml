@@ -32,7 +32,7 @@ configuration:
     description: >-
       This option allows you to advertise routes to subnets (accessible on the network
       your device is connected to) to other clients on your tailnet.
-      The add-on by default will advertise routes to your subnets on all supported
+      The app by default will advertise routes to your subnets on all supported
       interfaces by adding `local_subnets` to the list.
   exit_node:
     name: Use exit node

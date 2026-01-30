@@ -40,9 +40,9 @@ however, it is nice to know where you need to go later on.
 
 ## Configuration
 
-The add-on by default exposes "Exit Node" capabilities that you can enable from
+The app by default exposes "Exit Node" capabilities that you can enable from
 your Tailscale account. Additionally, if the Supervisor managed your network
-(which is the default), the add-on will also advertise routes to your subnets on
+(which is the default), the app will also advertise routes to your subnets on
 all supported interfaces to Tailscale.
 
 Consider disabling key expiry to avoid losing connection to your Home Assistant
@@ -162,7 +162,7 @@ If you want to disable this option, specify an empty list in the configuration
 
 More information: [Subnet routers][tailscale_info_subnets]
 
-The add-on by default will advertise routes to your subnets on all supported
+The app by default will advertise routes to your subnets on all supported
 interfaces by adding `local_subnets` to the list.
 
 ### Option: `exit_node`

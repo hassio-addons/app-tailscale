@@ -55,7 +55,7 @@ else
         [[ $(</proc/sys/net/ipv4/ip_forward) -eq 0 ]] && continue
       fi
 
-      ipinfo="$(/bin/ipcalc --json "${address}")"
+      ipinfo="$(ipcalc --json "${address}")"
       routes+=("$(bashio::jq "${ipinfo}" '.NETWORK + "/" + .PREFIX')")
     fi
   done

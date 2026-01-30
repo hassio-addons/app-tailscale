@@ -26,7 +26,9 @@ if ! /opt/tailscale status --self=true --peers=false --json \
 then
   # If Taildrive is not available but any share is configured, that is an error
   if (( 0 < $(wc -w <<< "${configured_share_names}") )); then
-    bashio::exit.nok "Tailscale's Taildrive is disabled but directories are configured for sharing"
+    bashio::exit.nok \
+      "Tailscale's Taildrive feature is not available, but directories are configured" \
+      "for sharing. Please check your Tailscale plan and ACL settings."
   fi
 else
   # Read currently shared directories into an array from tailscale drive list.
@@ -65,7 +67,7 @@ else
           bashio::exit.nok "Failed to unshare /${share_name}"
         fi
       else
-        bashio::log.info "Taildrive: skipping to unshare '${share_name}'"
+        bashio::log.info "Taildrive: skipping unshare of '${share_name}' (not managed by this app)"
       fi
     fi
   done

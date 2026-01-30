@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   workflows:
-    uses: hassio-addons/workflows/.github/workflows/release-drafter.yaml@main
+    uses: hassio-addons/workflows/.github/workflows/release-drafter.yaml@029301a2e990f6c1d430cad7cd1726970b2ca9d6 # v2.0.3

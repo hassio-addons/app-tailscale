@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # Take down the S6 supervision tree when protect-subnets fails
 # ==============================================================================
 readonly exit_code_container=$(</run/s6-linux-init-container-results/exitcode)

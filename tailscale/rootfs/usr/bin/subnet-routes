@@ -72,7 +72,7 @@ if (( 0 == ${#routes[@]} )) && \
 then
   bashio::log.warning \
     "There are no local subnets to advertise!" \
-    "Restart of the add-on is required after the issue is fixed!"
+    "Restart of the app is required after the issue is fixed!"
 fi
 
 printf "%s" "${response}"

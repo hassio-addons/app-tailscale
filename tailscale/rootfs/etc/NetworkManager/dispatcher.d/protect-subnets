@@ -2,8 +2,8 @@
 # shellcheck shell=bash
 # The shebang 'with-contenv-merge' above is identical with 'with-contenv', but doesn't clear the current environment containing the dispatcher variables
 
-function halt-add-on() {
-  bashio::log.error "Failed to protect subnet routes. Halting add-on to prevent network loss."
+function halt-app() {
+  bashio::log.error "Failed to protect subnet routes. Halting app to prevent network loss."
   echo -n 1 > /run/s6-linux-init-container-results/exitcode
   exec /run/s6/basedir/bin/halt
 }
@@ -13,8 +13,8 @@ case "${NM_DISPATCHER_ACTION}" in
     bashio::log.info "Handling Network Manager action ${DEVICE_IP_IFACE-} ${NM_DISPATCHER_ACTION}"
     unprotect-subnet-routes
     if ! protect-subnet-routes; then
-      # Better stop add-on than risking losing all network connections
-      halt-add-on
+      # Better stop app than risking losing all network connections
+      halt-app
     fi
     ;;
   dhcp4-change|dhcp6-change)
@@ -23,8 +23,8 @@ case "${NM_DISPATCHER_ACTION}" in
       bashio::log.info "Handling Network Manager action ${DEVICE_IP_IFACE-} ${NM_DISPATCHER_ACTION}"
       unprotect-subnet-routes
       if ! protect-subnet-routes tested; then
-        # Better stop add-on than risking losing all network connections
-        halt-add-on
+        # Better stop app than risking losing all network connections
+        halt-app
       fi
     fi
     ;;

@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # Enables Tailscale Serve or Funnel feature to share Home Assistant
 # ==============================================================================
 
@@ -44,7 +44,7 @@ fi
 
 if (( 200 != curl_result )); then
   # Warn that we can't test Home Assistant's HTTP reverse proxy configuration
-  # We emit only a warning to let the add-on start, maybe this is the only connection to access the device, better to start than not
+  # We emit only a warning to let the app start, maybe this is the only connection to access the device, better to start than not
   # Though starting tailscale serve without HA won't fail, but will fill the logs with messages forever in each ~10s
   bashio::log.warning "Home Assistant is not accessible currently, unable to test the connection to Home Assistant as reverse proxy"
 else
@@ -52,7 +52,7 @@ else
   if (( 200 != $(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$(bashio::core.port)" -H "X-Forwarded-For: 127.0.0.1") )); then
     bashio::exit.nok \
       "Unable to connect to Home Assistant as reverse proxy." \
-      "Please check your configuration based on the add-on's documentation under \"Option: share_homeassistant\"."
+      "Please check your configuration based on the app's documentation under \"Option: share_homeassistant\"."
   fi
 fi
 

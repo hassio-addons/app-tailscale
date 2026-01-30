@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # Remove forwarding
 # ==============================================================================
 

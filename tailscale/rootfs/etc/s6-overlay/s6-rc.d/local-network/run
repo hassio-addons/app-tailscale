@@ -15,9 +15,9 @@ declare wait_counter=0
 # Until HA has no default interface, we wait a little
 while ! bashio::api.supervisor GET "/network/interface/default/info" false &> /dev/null; do
   if (( wait_counter++ == WAIT_COUNT )); then
-    # We emit only a warning to let the add-on start, maybe this is the only connection to access the device, better to start than not.
+    # We emit only a warning to let the app start, maybe this is the only connection to access the device, better to start than not.
     # Let Tailscale figure out a way to connect to the tailnet if the local network is temporarily down.
-    # The add-on will emit warnings where it requires local network information, but can't get it.
+    # The app will emit warnings where it requires local network information, but can't get it.
     bashio::log.warning "Local network (default Home Assistant interface) is unreachable"
     break
   fi

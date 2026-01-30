@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # Runs tailscale
 # ==============================================================================
 declare -a options
@@ -35,11 +35,11 @@ if bashio::debug ; then
   exec /opt/tailscaled "${options[@]}"
 else
   bashio::log.notice \
-    "Tailscale logs will be suppressed after 200 lines, set add-on's" \
+    "Tailscale logs will be suppressed after 200 lines, set app's" \
     "configuration option 'log_level' to 'debug' to see further logs"
 
   /opt/tailscaled "${options[@]}" 2>&1 \
     | stdbuf -i0 -oL -eL \
       sed -n -e '1,200p' \
-        -e "201c[further tailscaled logs suppressed, set add-on's configuration option 'log_level' to 'debug' to see further tailscaled logs]"
+        -e "201c[further tailscaled logs suppressed, set app's configuration option 'log_level' to 'debug' to see further tailscaled logs]"
 fi

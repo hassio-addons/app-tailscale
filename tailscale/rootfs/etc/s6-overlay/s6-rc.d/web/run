@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # Runs tailscale web interface
 # ==============================================================================
 declare -a options
@@ -12,7 +12,7 @@ bashio::log.info 'Starting Tailscale web...'
 options+=(--listen 127.0.0.1:25899)
 
 # Use readonly webui mode
-# Note: can be removed later, after most of the add-on config options are available through the webui
+# Note: can be removed later, after most of the app config options are available through the webui
 options+=(--readonly)
 
 # Run Tailscale

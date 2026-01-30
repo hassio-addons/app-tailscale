@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Community Add-on: Tailscale
+# Home Assistant Community App: Tailscale
 # S6 Overlay stage2 hook to customize services
 # ==============================================================================
 
@@ -17,7 +17,7 @@ function try {
     set -e
 }
 
-# Load add-on options, even deprecated one to upgrade
+# Load app options, even deprecated one to upgrade
 options=$(bashio::addon.options)
 
 # Upgrade configuration from 'proxy', 'funnel' and 'proxy_and_funnel_port' to 'share_homeassistant' and 'share_on_port'

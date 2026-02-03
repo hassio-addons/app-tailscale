@@ -27,11 +27,14 @@ declare tailnet
 if ! bashio::config.has_value "accept_dns" || \
   bashio::config.true "accept_dns"
 then
-  # We have to be able to determine login_server from this address
-  if ! login_server=$(awk -F[/:] '{print $4}' <<<"$(bashio::config "login_server")") || \
-    ! bashio::var.has_value "${login_server}"
-  then
-    bashio::exit.nok "Determining host name from '$(bashio::config "login_server")' has failed"
+  # Get login_server if configured
+  if bashio::config.has_value "login_server"; then
+    # We have to be able to determine login_server from this address
+    if ! login_server=$(awk -F[/:] '{print $4}' <<<"$(bashio::config "login_server")") || \
+      ! bashio::var.has_value "${login_server}"
+    then
+      bashio::exit.nok "Determining host name from '$(bashio::config "login_server")' has failed"
+    fi
   fi
   black_white_list+=("${login_server}")
 

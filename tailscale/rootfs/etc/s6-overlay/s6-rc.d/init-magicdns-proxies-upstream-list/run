@@ -24,7 +24,9 @@ declare login_server="${DEFAULT_LOGIN_SERVER}"
 declare -a black_white_list=()
 declare tailnet
 
-if bashio::config.true "accept_dns"; then
+if ! bashio::config.has_value "accept_dns" || \
+  bashio::config.true "accept_dns"
+then
   # We have to be able to determine login_server from this address
   if ! login_server=$(awk -F[/:] '{print $4}' <<<"$(bashio::config "login_server")") || \
     ! bashio::var.has_value "${login_server}"

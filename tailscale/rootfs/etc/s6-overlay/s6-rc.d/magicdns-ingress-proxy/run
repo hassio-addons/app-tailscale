@@ -54,7 +54,9 @@ fi
 options+=(--bind-dynamic)
 options+=(--port=${DNSMASQ_INGRESS_PORT})
 
-if bashio::config.true "accept_dns"; then
+if ! bashio::config.has_value "accept_dns" || \
+  bashio::config.true "accept_dns"
+then
   # Black-list
   readarray -t black_list < "${DNSMASQ_BLACK_WHITE_LIST_LOCATION}"
 

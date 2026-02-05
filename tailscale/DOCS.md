@@ -78,6 +78,7 @@ log_level: info
 login_server: "https://controlplane.tailscale.com"
 share_homeassistant: disabled
 share_on_port: 443
+share_service_name: "svc:homeassistant"
 snat_subnet_routes: true
 stateful_filtering: false
 tags:
@@ -315,6 +316,18 @@ Only ports 443, 8443, and 10000 are allowed by Tailscale.
 
 Port 443 is used by default.
 
+### Option: `share_service_name`
+
+This option lets you specify the service name the Tailscale Serve and Funnel
+features will use to present your Home Assistant instance on the tailnet. They
+need to start with `svc:`.
+
+More information: [Services][tailscale_info_services]
+
+This option is unused by default. To make it visible on the configuration
+editor, click "Show unused optional configuration options" at the bottom of the
+page.
+
 ### Option: `snat_subnet_routes`
 
 This option allows subnet devices to see the traffic originating from the subnet
@@ -537,4 +550,5 @@ SOFTWARE.
 [tailscale_info_tags]: https://tailscale.com/kb/1068/tags
 [tailscale_info_taildrop]: https://tailscale.com/kb/1106/taildrop
 [tailscale_info_userspace_networking]: https://tailscale.com/kb/1112/userspace-networking
+[tailscale_info_services]: https://tailscale.com/docs/features/tailscale-services
 [tailscale_machines]: https://login.tailscale.com/admin/machines

@@ -12,6 +12,8 @@ readonly WAIT_COUNT=18  # 18*5s = 90s = 1.5m
 declare wait_counter=0
 declare curl_result
 
+declare -a options
+
 # Validate share_homeassistant value
 if ! bashio::config.equals 'share_homeassistant' 'serve' && \
   ! bashio::config.equals 'share_homeassistant' 'funnel'
@@ -66,8 +68,17 @@ if bashio::config.equals 'share_homeassistant' 'funnel'; then
   fi
 fi
 
+options+=("$(bashio::config 'share_homeassistant')")
+if bashio::config.has_value "share_service_name"; then
+  options+=(--service="$(bashio::config "share_service_name")")
+fi
+options+=(--bg=false)
+options+=(--https="$(bashio::config 'share_on_port')")
+options+=(--set-path=/)
+options+=(http://127.0.0.1:"$(bashio::core.port)")
+
 # This service can wait for HA for minutes, let notify S6 when we are really starting
 echo "" >&3
 
 # Set up serve or funnel
-exec /opt/tailscale $(bashio::config 'share_homeassistant') --https=$(bashio::config 'share_on_port') --set-path=/ "http://127.0.0.1:$(bashio::core.port)"
+exec /opt/tailscale "${options[@]}"

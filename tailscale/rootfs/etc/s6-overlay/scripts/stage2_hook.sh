@@ -59,6 +59,22 @@ if bashio::var.has_value "${proxy_and_funnel_port}"; then
     bashio::addon.option 'proxy_and_funnel_port'
 fi
 
+# MagicDNS related service dependencies:
+#
+#                                    +-------- magicdns-ingress-proxy
+#                                    |          |                 |
+#                                    |          |                 |
+#                                    ˅    !!    ˅                 |
+#   init-magicdns-proxies-upstream-list -----> post-tailscaled    |
+#                                    ˄          |                 |
+#                                    |          |                 |
+#                                    |    !!    ˅                 |
+#                 magicdns-egress-proxy <----- tailscaled         |
+#                                               |                 |
+#                                               |                 |
+#                                               ˅                 ˅
+#                                              init-magicdns-ingress-proxy
+#
 # Disable MagicDNS egress proxy service when userspace-networking is enabled or accepting dns is disabled
 if bashio::config.true "userspace_networking" || \
     bashio::config.false "accept_dns";

@@ -113,12 +113,6 @@ For more information, see the "DNS" section of this documentation.
 
 This option is enabled by default.
 
-**Note:** If you disable this option, there will be DNS-related warnings in
-Tailscale's log messages, repeating hourly: "no upstream resolvers set,
-returning SERVFAIL", and Tailscale's health also will warn about "Tailscale
-can't reach the configured DNS servers". It's true, this is not a problem,
-Tailscale's DNS will not use any upstream server.
-
 ### Option: `accept_routes`
 
 This option allows you to accept subnet routes advertised by other nodes in

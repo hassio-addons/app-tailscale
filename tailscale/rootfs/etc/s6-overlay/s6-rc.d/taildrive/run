@@ -40,8 +40,6 @@ else
     bashio::exit.nok "Error reading shared Taildrive directories from Tailscale."
   fi
 
-  ln -s "/homeassistant" "/config"
-
   # If a directory is configured but not shared, share it.
   # Note: do not quote configured_share_names in the for loop,
   # as we want to iterate over words (lines), this is not an array

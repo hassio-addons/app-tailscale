@@ -318,9 +318,11 @@ Port 443 is used by default.
 
 ### Option: `share_service_name`
 
-This option lets you specify the service name the Tailscale Serve and Funnel
-features will use to present your Home Assistant instance on the tailnet. They
-need to start with `svc:`.
+This option lets you specify the service name the Tailscale Serve feature will
+use to present your Home Assistant instance on the tailnet. It needs to start
+with `svc:`.
+
+**Note:** The Tailscale Funnel feature will ignore this option.
 
 More information: [Services][tailscale_info_services]
 

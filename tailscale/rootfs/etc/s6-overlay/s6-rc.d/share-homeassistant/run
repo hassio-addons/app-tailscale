@@ -69,8 +69,10 @@ if bashio::config.equals 'share_homeassistant' 'funnel'; then
 fi
 
 options+=("$(bashio::config 'share_homeassistant')")
-if bashio::config.has_value "share_service_name"; then
-  options+=(--service="$(bashio::config "share_service_name")")
+if bashio::config.equals 'share_homeassistant' 'serve' && \
+  bashio::config.has_value 'share_service_name'
+then
+  options+=(--service="$(bashio::config 'share_service_name')")
 fi
 options+=(--bg=false)
 options+=(--https="$(bashio::config 'share_on_port')")

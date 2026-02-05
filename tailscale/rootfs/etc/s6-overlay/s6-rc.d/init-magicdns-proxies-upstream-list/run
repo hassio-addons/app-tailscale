@@ -38,10 +38,8 @@ if bashio::config.true "accept_dns"; then
     black_white_list+=("${LOG_SERVER}")
   fi
 
-  # If serve or funnel is used, resolve letsencrypt's api also
-  if ! bashio::config.equals 'share_homeassistant' 'disabled'; then
-    black_white_list+=("${LETSENCRYPT_API}")
-  fi
+  # Always resolve letsencrypt's api also (independent of share_homeassistant)
+  black_white_list+=("${LETSENCRYPT_API}")
 else
   # Add the tailnet domain as white list
   if ! tailnet=$( \

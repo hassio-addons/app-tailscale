@@ -78,6 +78,7 @@ log_level: info
 login_server: "https://controlplane.tailscale.com"
 share_homeassistant: disabled
 share_on_port: 443
+share_from_port: 8080
 snat_subnet_routes: true
 stateful_filtering: false
 tags:
@@ -314,6 +315,13 @@ internet.
 Only ports 443, 8443, and 10000 are allowed by Tailscale.
 
 Port 443 is used by default.
+
+### Option: `share_from_port`
+
+This option lets you specify which internal port the Tailscale Serve and Funnel 
+features will present to the internet.
+
+Port 8123 (the Home Assistant UI port) is used by default.
 
 ### Option: `snat_subnet_routes`
 

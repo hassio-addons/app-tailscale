@@ -74,6 +74,12 @@ configuration:
       internet.
       Only ports 443, 8443, and 10000 are allowed by Tailscale.
       Port 443 is used by default.
+  share_from_port:
+    name: Internal port to proxy
+    description: >-
+      This option lets you specify which internal port the Tailscale Serve and Funnel 
+      features will present to the internet.
+      Port 8123 (the Home Assistant UI port) is used by default.
   snat_subnet_routes:
     name: Source NAT subnet routes
     description: >-

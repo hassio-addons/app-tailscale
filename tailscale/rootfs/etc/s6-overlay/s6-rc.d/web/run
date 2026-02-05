@@ -10,7 +10,7 @@ declare -a options
 bashio::log.info 'Starting Tailscale web...'
 
 # Get random port
-options+=(--listen 127.0.0.1:25899)
+options+=(--listen 127.0.0.1:25898)
 
 # Use readonly webui mode
 # Note: can be removed later, after most of the app config options are available through the webui

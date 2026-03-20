@@ -76,7 +76,7 @@ then
 fi
 options+=(--bg=false)
 options+=(--https="$(bashio::config 'share_on_port')")
-options+=(--set-path=/)
+options+=(--set-path="$(bashio::config 'share_path')")
 options+=(http://127.0.0.1:"$(bashio::core.port)")
 
 # This service can wait for HA for minutes, let notify S6 when we are really starting

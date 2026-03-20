@@ -74,6 +74,14 @@ configuration:
       internet.
       Only ports 443, 8443, and 10000 are allowed by Tailscale.
       Port 443 is used by default.
+  share_path:
+    name: Share path
+    description: >-
+      This option lets you specify the HTTP path the Tailscale Serve and Funnel
+      features will use to present your Home Assistant instance.
+      By default, it uses `/`, which exposes the full Home Assistant path space.
+      The value must start with `/` and must not include query strings (`?`) or
+      URL fragments (`#`).
   share_service_name:
     name: Share service name
     description: >-

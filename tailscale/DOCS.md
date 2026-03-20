@@ -78,6 +78,7 @@ log_level: info
 login_server: "https://controlplane.tailscale.com"
 share_homeassistant: disabled
 share_on_port: 443
+share_path: "/"
 share_service_name: "svc:homeassistant"
 snat_subnet_routes: true
 stateful_filtering: false
@@ -322,6 +323,22 @@ internet.
 Only ports 443, 8443, and 10000 are allowed by Tailscale.
 
 Port 443 is used by default.
+
+### Option: `share_path`
+
+This option lets you specify the HTTP path that the Tailscale Serve and Funnel
+features will use to present your Home Assistant instance.
+
+By default, this option is set to `/` and exposes the full Home Assistant path
+space.
+
+You can set a narrower path, for example:
+
+- `/api/webhook/your-very-long-random-id`
+- `/api/`
+
+The value must start with `/` and must not include query strings (`?`) or URL
+fragments (`#`).
 
 ### Option: `share_service_name`
 

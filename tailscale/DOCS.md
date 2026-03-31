@@ -542,7 +542,7 @@ SOFTWARE.
 [app-badge]: https://my.home-assistant.io/badges/supervisor_addon.svg
 [app]: https://my.home-assistant.io/redirect/supervisor_addon/?addon=a0d7b954_tailscale&repository_url=https%3A%2F%2Fgithub.com%2Fhassio-addons%2Frepository
 [contributors]: https://github.com/hassio-addons/app-tailscale/graphs/contributors
-[discord-ha]: https://discord.gg/c5DvZ4e
+[discord-ha]: https://www.home-assistant.io/join-chat
 [discord]: https://discord.me/hassioaddons
 [forum]: https://community.home-assistant.io/?u=frenck
 [frenck]: https://github.com/frenck

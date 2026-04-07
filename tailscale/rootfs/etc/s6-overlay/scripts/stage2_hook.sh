@@ -9,6 +9,11 @@ declare options
 declare proxy funnel proxy_and_funnel_port
 declare share_service_name
 
+readonly MAGIC_DNS_IPV4="100.100.100.100"
+readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
+declare dns
+declare invalid_dns_config
+
 # Load app options, even deprecated one to upgrade
 options=$(bashio::app.options)
 
@@ -55,6 +60,29 @@ share_service_name=$(bashio::jq "${options}" '.share_service_name | select(.!=nu
 if bashio::var.has_value "${share_service_name}"; then
     bashio::log.info 'Removing deprecated share_service_name option'
     bashio::app.option 'share_service_name'
+fi
+
+# Check DNS configuration
+# This is identical with the check in init-magicdns-ingress-proxy/run
+# This check is to modify the configuration to prevent the check in init-magicdns-ingress-proxy/run from stopping the app startup
+invalid_dns_config="false"
+for dns in $(bashio::dns.locals); do
+    if bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV4}" || \
+        bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV6}"
+    then
+        bashio::log.warning \
+            "Do not configure MagicDNS's IP address (${dns:6}) as DNS server under Settings -> System -> Network"
+        invalid_dns_config="true"
+    fi
+done
+if bashio::var.true "${invalid_dns_config}"; then
+    bashio::log.warning \
+        "Due to invalid networking DNS configuration, userspace_networking option will be enabled to disable MagicDNS"
+    bashio::log.warning \
+        "Please check your configuration based on the app's documentation under the \"DNS\" section"
+    bashio::log.warning \
+        "After the issue is fixed you can disable userspace_networking option again and restart the app"
+    bashio::app.option 'userspace_networking' 'true'
 fi
 
 # MagicDNS related service dependencies:

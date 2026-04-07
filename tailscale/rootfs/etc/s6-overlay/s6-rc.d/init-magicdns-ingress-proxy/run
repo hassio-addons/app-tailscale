@@ -37,7 +37,8 @@ for dns in $(bashio::dns.locals); do
   if bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV4}" || \
     bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV6}"
   then
-    bashio::log.fatal "Do not configure MagicDNS's IP address (${dns:6}) as DNS server under Settings -> System -> Network"
+    bashio::log.fatal \
+      "Do not configure MagicDNS's IP address (${dns:6}) as DNS server under Settings -> System -> Network"
     invalid_dns_config="true"
   fi
 done

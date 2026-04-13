@@ -17,8 +17,6 @@ export LOG_FD
 # So in case of IPv6-only hassio, we can't use [::1]:53 for the egress DNS proxy, but we can't use anything else in resolv.conf for tailscaled.
 # For the status of IPv6 support see https://github.com/home-assistant/supervisor/issues/2133
 
-source /usr/lib/trace.sh
-
 readonly DNSMASQ_EGRESS_ADDRESS_IPV4="127.100.100.100"
 readonly DNSMASQ_EGRESS_DEFAULT_PORT=53127
 
@@ -105,7 +103,7 @@ else
   bashio::exit.nok "Invalid MAGICDNS_MODE: '${MAGICDNS_MODE}'"
 fi
 
-if bashio_custom::trace; then
+if bashio::trace; then
   options+=(--log-queries)
   options+=(--log-debug)
 fi

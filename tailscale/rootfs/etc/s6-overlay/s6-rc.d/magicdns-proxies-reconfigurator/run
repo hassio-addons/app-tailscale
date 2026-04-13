@@ -20,13 +20,6 @@ declare previous_ipn_dns_config=
 declare magicdns_proxies_configuration
 declare healthy=true
 
-function try {
-    set +e
-    (set -e; "$@")
-    declare -gx TRY_ERROR=$?
-    set -e
-}
-
 function file_non_empty() {
     local file=${1}
 
@@ -91,8 +84,8 @@ do
       fi
       # Restart dnsmasq proxies if required
       if ! bashio::var.equals "${magicdns_proxies_configuration}" 'unchanged'; then
-        try restart_proxies
-        if ((TRY_ERROR)); then
+        bashio::try restart_proxies
+        if bashio::try.failed; then
           bashio::exit.nok "Failed to reconfigure and restart MagicDNS proxies. Halting app to prevent network loss."
         fi
       fi

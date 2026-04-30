@@ -5,6 +5,9 @@ export LOG_FD
 # Home Assistant Community App: Tailscale
 # Runs after the machine has been logged in into the Tailscale network
 # ==============================================================================
+
+source /usr/lib/api.core.sh
+
 declare interface
 declare -a options
 declare -a routes=()
@@ -13,6 +16,7 @@ declare -a colliding_routes=()
 declare login_server
 declare tags
 declare keyexpiry
+declare attributes
 
 # Default options
 options+=(--hostname "$(bashio::info.hostname)")
@@ -139,9 +143,25 @@ fi
 
 # Warn about key expiration
 if keyexpiry=$(/opt/tailscale status --self=true --peers=false --json | jq -rce '.Self.KeyExpiry'); then
+  keyexpiry="${keyexpiry:0:10} ${keyexpiry:11:8} UTC"
+
   bashio::log.warning "The connection's key will expire on: ${keyexpiry}"
   bashio::log.warning "Consider disabling key expiry to avoid losing connection to your Home Assistant device."
-  bashio::log.warning "Please check your configuration based on the app's documentation under \"Configuration\""
+  bashio::log.warning "Please check your configuration based on the app's documentation under the \"Configuration\" section."
+
+  # Create persistent notification also, but only once
+  if ! bashio::fs.file_exists "/data/key_expiry_notification_is_done"; then
+    attributes=$(bashio::var.json \
+        title "Tailscale App" \
+        message "$(printf "%s\n\n" \
+          "**The connection's key will expire on: ${keyexpiry}!**" \
+          "Consider disabling key expiry to avoid losing connection to your Home Assistant device." \
+          "You can use the [Machines page](https://login.tailscale.com/admin/machines) of Tailscale's admin console to disable key expiry." \
+          "Please check your configuration based on the app's documentation under the \"Configuration\" section.")")
+    if api.core POST services/persistent_notification/create "${attributes}" -w > /dev/null; then
+      touch "/data/key_expiry_notification_is_done"
+    fi
+  fi
 fi
 
 # Warn about colliding subnet routes if non-userspace networking and accepting routes are enabled

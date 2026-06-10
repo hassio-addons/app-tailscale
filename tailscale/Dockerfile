@@ -11,7 +11,7 @@ ARG TAILSCALE_VERSION="v1.98.4"
 RUN \
     apk add --no-cache \
         bind-tools=9.20.23-r0 \
-        dnsmasq=2.91-r1 \
+        dnsmasq=2.92_p2-r0 \
         ethtool=6.15-r0 \
         ipcalc=1.0.3-r1 \
         iproute2=6.17.0-r0 \

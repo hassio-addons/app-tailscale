@@ -15,7 +15,7 @@ RUN \
         ethtool=6.15-r0 \
         ipcalc=1.0.3-r1 \
         iproute2=6.17.0-r0 \
-        iptables=1.8.11-r1 \
+        iptables=1.8.13-r0 \
         nginx=1.28.3-r3 \
         coreutils=9.8-r1 \
         networkmanager=1.54.3-r0 \

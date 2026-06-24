@@ -16,7 +16,7 @@ RUN \
         ipcalc=1.0.3-r1 \
         iproute2=7.0.0-r0 \
         iptables=1.8.13-r0 \
-        nginx=1.30.2-r1 \
+        nginx=1.30.3-r0 \
         coreutils=9.11-r0 \
         networkmanager=1.52.2-r0 \
     \

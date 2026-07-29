@@ -15,7 +15,7 @@ It is free to use for personal & hobby projects, up to 100 clients/devices on a
 single user account. Sign up using your Google, Microsoft or GitHub account at
 the following URL:
 
-<https://console.tailscale.com/start>
+https://tailscale.com/start
 
 You can also create an account during the app installation processes,
 however, it is nice to know where you need to go later on.

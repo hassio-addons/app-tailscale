@@ -231,8 +231,8 @@ you are troubleshooting.
 ### Option: `log_upload`
 
 Controls Tailscale's client log upload to log.tailscale.com. Enable it if your
-tailnet policy/Admin Console requires client log upload, otherwise Tailscale
-and the app can refuse to start.
+tailnet policy requires client log upload, otherwise Tailscale and the app can
+refuse to start.
 
 **Note:** When disabled, turns on Tailscale's `--no-logs-no-support` flag.
 

@@ -23,9 +23,9 @@ privileged:
 devices:
   - /dev/net/tun
 map:
-  - type: addons
+  - type: local_apps
     read_only: false
-  - type: all_addon_configs
+  - type: all_app_configs
     read_only: false
   - type: backup
     read_only: false
@@ -56,8 +56,8 @@ options:
   stateful_filtering: false
   tags: []
   taildrive:
-    addons: false
-    addon_configs: false
+    local_apps: false
+    app_configs: false
     backup: false
     config: false
     media: false
@@ -83,8 +83,8 @@ schema:
   tags:
     - "match(^tag:[a-zA-Z][a-zA-Z0-9-]*$)"
   taildrive:
-    addons: bool
-    addon_configs: bool
+    local_apps: bool
+    app_configs: bool
     backup: bool
     config: bool
     media: bool

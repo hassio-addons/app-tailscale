@@ -84,8 +84,8 @@ tags:
   - tag:example
   - tag:homeassistant
 taildrive:
-  addons: false
-  addon_configs: false
+  local_apps: false
+  app_configs: false
   backup: false
   config: false
   media: false

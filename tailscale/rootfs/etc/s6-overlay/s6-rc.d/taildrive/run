@@ -14,7 +14,8 @@ declare active_share_names
 declare share_name
 
 # Read all possible and configured directories from the app configuration.
-if ! all_share_names=$(bashio::config 'taildrive' | jq -rc 'keys_unsorted[]') || \
+# Add deprecated directory names to all possible directories to be able to unshare them
+if ! all_share_names=$(bashio::config 'taildrive' | jq -rc 'keys_unsorted[]'; printf 'addons\naddon_configs\n') || \
   ! configured_share_names=$(bashio::config 'taildrive' | jq -rc 'to_entries[] | select(.value) | .key')
 then
   bashio::exit.nok "Error reading configured Taildrive directories from app configuration."
@@ -40,20 +41,6 @@ else
     bashio::exit.nok "Error reading shared Taildrive directories from Tailscale."
   fi
 
-  # If a directory is configured but not shared, share it.
-  # Note: do not quote configured_share_names in the for loop,
-  # as we want to iterate over words (lines), this is not an array
-  for share_name in ${configured_share_names}; do
-    if ! grep -Fxq -- "${share_name}" <<< "${active_share_names}"; then
-      bashio::log.info "Taildrive: sharing /${share_name}"
-      if ! /opt/tailscale drive share "${share_name}" "/${share_name}"; then
-        bashio::exit.nok "Failed to share /${share_name}"
-      fi
-    else
-      bashio::log.info "Taildrive: /${share_name} is already shared"
-    fi
-  done
-
   # If a directory is shared but not configured, and managed by this app, unshare it.
   # Note: do not quote active_share_names in the for loop,
   # as we want to iterate over words (lines), this is not an array
@@ -67,6 +54,20 @@ else
       else
         bashio::log.info "Taildrive: skipping unshare of '${share_name}' (not managed by this app)"
       fi
+    fi
+  done
+
+  # If a directory is configured but not shared, share it.
+  # Note: do not quote configured_share_names in the for loop,
+  # as we want to iterate over words (lines), this is not an array
+  for share_name in ${configured_share_names}; do
+    if ! grep -Fxq -- "${share_name}" <<< "${active_share_names}"; then
+      bashio::log.info "Taildrive: sharing /${share_name}"
+      if ! /opt/tailscale drive share "${share_name}" "/${share_name}"; then
+        bashio::exit.nok "Failed to share /${share_name}"
+      fi
+    else
+      bashio::log.info "Taildrive: /${share_name} is already shared"
     fi
   done
 fi

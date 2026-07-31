@@ -8,6 +8,7 @@ export LOG_FD
 
 declare options
 declare proxy funnel proxy_and_funnel_port
+declare taildrive_addons taildrive_config
 declare share_service_name
 
 # This is to execute potentially failing supervisor api functions within conditions,
@@ -58,6 +59,17 @@ fi
 if bashio::var.has_value "${proxy_and_funnel_port}"; then
     bashio::log.info 'Removing deprecated proxy_and_funnel_port option'
     bashio::addon.option 'proxy_and_funnel_port'
+fi
+
+# Update changed options
+taildrive_addons=$(bashio::jq "${options}" '.taildrive.addons | select(.!=null)')
+if bashio::var.has_value "${taildrive_addons}"; then
+    bashio::log.info 'Updating taildrive option to match new schema'
+    taildrive_config=$(bashio::jq "${options}" '
+        .taildrive
+        | if has("addons") then .local_apps = .addons end | del(.addons)
+        | if has("addon_configs") then .app_configs = .addon_configs end | del(.addon_configs)')
+    bashio::app.option 'taildrive' "^${taildrive_config}"
 fi
 
 # Remove deprecated share_service_name option

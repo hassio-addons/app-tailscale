@@ -15,7 +15,7 @@ declare share_name
 
 # Read all possible and configured directories from the app configuration.
 # Add deprecated directory names to all possible directories to be able to unshare them
-if ! all_share_names=$(bashio::config 'taildrive' | jq -rc 'keys_unsorted[]'; printf 'addons\naddon_configs\n') || \
+if ! all_share_names=$(bashio::config 'taildrive' | jq -rc 'keys_unsorted[]' && printf 'addons\naddon_configs\n') || \
   ! configured_share_names=$(bashio::config 'taildrive' | jq -rc 'to_entries[] | select(.value) | .key')
 then
   bashio::exit.nok "Error reading configured Taildrive directories from app configuration."

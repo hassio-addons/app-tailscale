@@ -5,11 +5,9 @@ export LOG_FD
 
 readonly NM_DISPATCHER_LISTENER_QUEUE=/run/nm-dispatcher-listener-queue
 
-# Redirect outputs to the log (&2 is already set up as pipe by s6)
-exec 1>&2
-if [[ "${LOG_FD:-}" =~ ^[0-9]+$ ]]; then
-  eval "exec ${LOG_FD}>&1" || true
-fi
+# Redirect outputs to the log (though &2 is already set up as pipe by s6)
+exec &> /proc/1/fd/1
+bashio::log.reinitialize_output
 
 case "${NM_DISPATCHER_ACTION}" in
   up|down|dhcp4-change|dhcp6-change)

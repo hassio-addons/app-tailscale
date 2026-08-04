@@ -50,7 +50,7 @@ bashio::log.info "Subscribing to IPN message bus..."
 # This jq filters the whole state into sg. like:
 # {"Resolvers":true,"Routes":["foo.com","tail1234.ts.net.","ts.net."]}
 # If the structure changes, that should break the most basic smoke test after a TS client update, so we can fix it before release
-/opt/tailscale debug watch-ipn --initial=true --netmap=true --rate-limit=false \
+/opt/tailscale debug watch-ipn --initial=true \
 | stdbuf -i0 -oL -eL jq -rcM '{"DNS": .NetMap | has("DNS"), "Resolvers": .NetMap.DNS | has("Resolvers"), "Routes": .NetMap.DNS.Routes // {} | keys}' \
 | while IFS= read -r current_ipn_dns_config
 do

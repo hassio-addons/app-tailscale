@@ -14,9 +14,6 @@ readonly MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION="/run
 # updated by the magicdns-ingress-proxy service
 readonly DNSMASQ_INGRESS_PORT_LOCATION="/run/dnsmasq_ingress_port"
 
-declare current_ipn_dns_config
-declare previous_ipn_dns_config=
-
 declare magicdns_proxies_configuration
 declare healthy=true
 
@@ -47,37 +44,34 @@ function restart_proxies() {
 }
 
 bashio::log.info "Subscribing to IPN message bus..."
-# This jq filters the whole state into sg. like:
-# {"Resolvers":true,"Routes":["foo.com","tail1234.ts.net.","ts.net."]}
-# If the structure changes, that should break the most basic smoke test after a TS client update, so we can fix it before release
-/opt/tailscale debug watch-ipn --initial=true \
-| stdbuf -i0 -oL -eL jq -rcM '{"DNS": .NetMap | has("DNS"), "Resolvers": .NetMap.DNS | has("Resolvers"), "Routes": .NetMap.DNS.Routes // {} | keys}' \
-| while IFS= read -r current_ipn_dns_config
+# After version v1.102 TS doesn't emit the NetMap in IPN messages, we should detect the Notify.SelfChange signal, then query the DNS status.
+# Details: https://github.com/tailscale/tailscale/commit/aa5da2e5f22a785f345e0a05dd8a318a8a50976e
+# The --initial=true flag is intentionally not used, there is no equivalent for the SelfChange signal, we echo a dummy SelfChange signal instead.
+# The jq emits only empty lines, there is no usable DNS info in the messages.
+{ echo '{"SelfChange":true}'; /opt/tailscale debug watch-ipn; } \
+| stdbuf -i0 -oL -eL jq -rcM 'select(.SelfChange != null) | ""' \
+| while IFS= read -r
 do
-  if [[ "${current_ipn_dns_config}" == '{"DNS":true,'* && "${current_ipn_dns_config}" != "${previous_ipn_dns_config}" ]]; then
+  # On the first run and on subsequent SelfChange events we compare the current
+  # DNS state with the previous call of configure-magicdns-proxies script.
+  # The configure-magicdns-proxies script is first called from the
+  # magicdns-proxies-configurator service, then from this service.
+  # This way we don't miss any change even between the startup of these 2 services
 
-    # This seems to be double check, but not completely:
-    # - The ipn watcher will send the initial state, and we compare then the current DNS state
-    #   with the previous call of configure-magicdns-proxies from the magicdns-proxies-configurator service.
-    #   This way we don't miss any change between the startup of these 2 services.
-    # - On subsequent ipn watcher state changes we use the `tailscale dns status` json, that should be stable
-
-    # If we can't check the DNS configuration, the healthcheck script will treat it as an offline situation
-    if ! magicdns_proxies_configuration=$(configure-magicdns-proxies test); then
-      printf "UNHEALTHY" > /var/run/s6/container_environment/MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE
-      healthy=false
-    else
-      previous_ipn_dns_config="${current_ipn_dns_config}"
-      if bashio::var.false "${healthy}"; then
-        printf "HEALTHY" > /var/run/s6/container_environment/MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE
-        healthy=true
-      fi
-      # Restart dnsmasq proxies if required
-      if ! bashio::var.equals "${magicdns_proxies_configuration}" 'unchanged'; then
-        bashio::try restart_proxies
-        if bashio::try.failed; then
-          bashio::exit.nok "Failed to reconfigure and restart MagicDNS proxies. Halting app to prevent network loss."
-        fi
+  # If we can't check the DNS configuration, the healthcheck script will treat it as an offline situation
+  if ! magicdns_proxies_configuration=$(configure-magicdns-proxies test); then
+    printf "UNHEALTHY" > /var/run/s6/container_environment/MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE
+    healthy=false
+  else
+    if bashio::var.false "${healthy}"; then
+      printf "HEALTHY" > /var/run/s6/container_environment/MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE
+      healthy=true
+    fi
+    # Restart dnsmasq proxies if required
+    if ! bashio::var.equals "${magicdns_proxies_configuration}" 'unchanged'; then
+      bashio::try restart_proxies
+      if bashio::try.failed; then
+        bashio::exit.nok "Failed to reconfigure and restart MagicDNS proxies. Halting app to prevent network loss."
       fi
     fi
   fi

@@ -5,6 +5,9 @@ export LOG_FD
 # Home Assistant Community App: Tailscale
 # Runs after the machine has been logged in into the Tailscale network
 # ==============================================================================
+
+shopt -s extglob
+
 declare interface
 declare -a options
 declare -a routes=()

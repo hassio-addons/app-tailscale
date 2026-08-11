@@ -5,14 +5,13 @@
 # Advertises configured Tailscale Services from this host
 # ==============================================================================
 
-shopt -s extglob
-
 declare current_config
+
 declare service
 declare service_name
+declare target
 declare protocol
 declare port
-declare target
 declare path
 
 declare -a options=()
@@ -20,84 +19,95 @@ declare -a configured_services=()
 declare -a configured_names=()
 declare -a current_names=()
 
-declare https_checked=false
+function drain_and_clear_service() {
+  local service_name=${1}
 
-# Read configured services
+  if ! /opt/tailscale serve drain "${service_name}"; then
+    bashio::log.warning "Failed to drain service host ${service_name}"
+  fi
+  if ! /opt/tailscale serve clear "${service_name}"; then
+    bashio::log.warning "Failed to clear service host ${service_name}"
+  fi
+}
+
+# Read currently advertised services from the tailscale serve config
+if ! current_config=$(/opt/tailscale serve status --json); then
+  bashio::exit.nok "Unable to determine current Tailscale Services configuration"
+fi
+
+# Read configured services from app configuration
 # Note: bashio::config emits one JSON object per line for array options
 readarray -t configured_services < <(bashio::config 'services')
 
-# Build a list of configured service names
-readarray -t configured_names < <(bashio::jq "$(printf '%s\n' "${configured_services[@]}")" '.name')
-
-if bashio::var.has_value "${configured_names[*]}"; then
-    bashio::log.info "Configured service hosts: ${configured_names[*]}"
+# Validate all services.protocol values
+if protocol=$( \
+  bashio::jq "${configured_services[*]}" '.protocol | select(.|IN("http","https","tcp","tls-terminated-tcp")|not)' -e \
+  | sort -u)
+then
+  bashio::exit.nok "Invalid value(s) '${protocol//$'\n'/\', \'}' for services.protocol. Must be one of 'http', 'https', 'tcp' or 'tls-terminated-tcp'."
 fi
 
-# Read currently advertised services from the tailscale serve config
-if ! current_config=$(/opt/tailscale serve get-config --all 2>/dev/null); then
-    current_config='{}'
+# Check if Tailscale HTTPS is enabled if needed
+if bashio::jq "${configured_services[*]}" '.protocol | select(.|IN("https","tls-terminated-tcp"))' -e >/dev/null && \
+  ! /opt/tailscale status --self=true --peers=false --json \
+    | jq -rce '.Self.CapMap | has("https")' > /dev/null;
+then
+  bashio::exit.nok \
+    "Tailscale's HTTPS support is disabled." \
+    "Please check your configuration based on the app's documentation under \"Option: services\"."
 fi
 
-# Build a list of currently configured service names
-readarray -t current_names < <(bashio::jq "${current_config}" '.services // {} | keys[]' || true)
+# Build a list of unique configured service names
+readarray -t configured_names < <( \
+  bashio::jq "${configured_services[*]}" '.name' \
+  | sort -u)
+
+# Build a list of unique currently configured service names
+readarray -t current_names < <( \
+  bashio::jq "${current_config}" '.Services // {} | keys[]' \
+  | sort -u)
 
 # Remove services that are no longer configured in this app
+# current_names \ configured_names
 for service_name in "${current_names[@]}"; do
-    if ! printf '%s\n' "${configured_names[@]}" | grep -qx "${service_name}"; then
-        bashio::log.info "Removing stale service host configuration for ${service_name}"
-        if ! /opt/tailscale serve drain "${service_name}" >/dev/null 2>&1; then
-            bashio::log.warning "Failed to drain stale service host ${service_name}"
-        fi
-        if ! /opt/tailscale serve clear "${service_name}" >/dev/null 2>&1; then
-            bashio::log.warning "Failed to clear stale service host ${service_name}"
-        fi
-    fi
+  if ! [[ " ${configured_names[*]} " =~ " ${service_name} " ]]; then
+    bashio::log.info "Removing stale service host configuration for ${service_name}"
+    drain_and_clear_service "${service_name}"
+  fi
 done
+
+# Clean any existing configuration for this service before reconfiguring
+# current_names ⋂ configured_names
+for service_name in "${configured_names[@]}"; do
+  if [[ " ${current_names[*]} " =~ " ${service_name} " ]]; then
+    drain_and_clear_service "${service_name}"
+  fi
+done
+
+if (( 0 < "${#configured_names[@]}" )); then
+  bashio::log.info "Configured service hosts: ${configured_names[*]}"
+fi
 
 # Configure and advertise each service
 for service in "${configured_services[@]}"; do
-    service_name=$(bashio::jq "${service}" '.name')
-    protocol=$(bashio::jq "${service}" '.protocol')
-    port=$(bashio::jq "${service}" '.port')
-    target=$(bashio::jq "${service}" '.target')
-    path=$(bashio::jq "${service}" '.path // empty')
+  service_name=$(bashio::jq "${service}" '.name')
+  target=$(bashio::jq "${service}" '.target')
+  protocol=$(bashio::jq "${service}" '.protocol')
+  port=$(bashio::jq "${service}" '.port')
+  path=$(bashio::jq "${service}" '.path // empty')
 
-    if ! [[ "${protocol}" = @(http|https|tcp|tls-terminated-tcp) ]]; then
-        bashio::exit.nok "Invalid value '${protocol}' for services.protocol"
-    fi
+  options=("serve")
+  options+=("--service=${service_name}")
+  options+=("--${protocol}=${port}")
 
-    if ! "${https_checked}" && [[ "${protocol}" = @(https|tls-terminated-tcp) ]]; then
-        if ! tailscale_status=$(/opt/tailscale status --self=true --peers=false --json 2>/dev/null); then
-            bashio::exit.nok "Unable to determine Tailscale HTTPS support"
-        fi
-        if [[ "$(bashio::jq "${tailscale_status}" '.Self.CapMap | has("https")')" != "true" ]]; then
-            bashio::exit.nok "Tailscale's HTTPS support is disabled"
-        fi
-        https_checked=true
-    fi
+  if bashio::var.has_value "${path}"; then
+    options+=("--set-path=${path}")
+  fi
 
-    options=("serve")
-    options+=("--service=${service_name}")
-    options+=("--${protocol}=${port}")
+  options+=("${target}")
 
-    if bashio::var.has_value "${path}"; then
-        options+=("--set-path=${path}")
-    fi
-
-    options+=("${target}")
-
-    # Clean any existing configuration for this service before reconfiguring
-    if ! /opt/tailscale serve drain "${service_name}" >/dev/null 2>&1; then
-        bashio::log.warning "Failed to drain service host ${service_name}"
-    fi
-    if ! /opt/tailscale serve clear "${service_name}" >/dev/null 2>&1; then
-        bashio::log.warning "Failed to clear service host ${service_name}"
-    fi
-
-    bashio::log.info "Advertising service host for ${service_name}"
-    if ! /opt/tailscale "${options[@]}"; then
-        bashio::exit.nok "Failed to advertise service host for ${service_name}"
-    fi
+  bashio::log.info "Advertising service host for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})"
+  if ! /opt/tailscale "${options[@]}"; then
+    bashio::exit.nok "Failed to advertise service host for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})"
+  fi
 done
-
-exit 0

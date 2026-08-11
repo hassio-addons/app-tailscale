@@ -22,6 +22,78 @@ jobs:
       security-events: write
     uses: hassio-addons/workflows/.github/workflows/app-ci.yaml@3846ae0fd09acec8ac1ac308ceacd052b9d01bec # v2.0.6
 
+  # Every main commit becomes a tagged GitHub release so Home Assistant
+  # can pick up Tailscale (and other) updates. Uses DISPATCH_TOKEN (PAT)
+  # so the release event is allowed to trigger the stable deploy job below.
+  release:
+    name: Create release
+    if: github.event_name == 'push'
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 🚀 Create tag and GitHub release
+        env:
+          # PAT required so publishing this release triggers workflows.
+          # Falls back to GITHUB_TOKEN (release is created, but deploy
+          # will not auto-run on the release event without a PAT).
+          GH_TOKEN: ${{ secrets.DISPATCH_TOKEN || secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if git describe --exact-match --tags "${SHA}" >/dev/null 2>&1; then
+            echo "Commit ${SHA} is already tagged; skipping release."
+            exit 0
+          fi
+
+          git fetch --tags --force origin
+
+          latest="$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n1 || true)"
+          if [[ -z "${latest}" ]]; then
+            # One minor ahead of upstream's last release (v0.28.1).
+            next="v0.29.0"
+          else
+            ver="${latest#v}"
+            IFS=. read -r major minor patch _ <<< "${ver}"
+            major="${major:-0}"
+            minor="${minor:-0}"
+            patch="${patch:-0}"
+            patch=$((patch + 1))
+            next="v${major}.${minor}.${patch}"
+          fi
+
+          if git rev-parse "refs/tags/${next}" >/dev/null 2>&1; then
+            echo "Tag ${next} already exists; skipping release."
+            exit 0
+          fi
+
+          tailscale_version="$(
+            sed -n 's/^ARG TAILSCALE_VERSION="\(.*\)"/\1/p' tailscale/Dockerfile \
+              | head -n1
+          )"
+          notes="Automated release from \`${SHA:0:7}\`."
+          if [[ -n "${tailscale_version}" ]]; then
+            notes+=$'\n\n'"Tailscale: ${tailscale_version}"
+          fi
+
+          gh release create "${next}" \
+            --title "${next}" \
+            --notes "${notes}" \
+            --target "${SHA}"
+
+          echo "Created release ${next}"
+
   deploy:
     needs: ci
     permissions:

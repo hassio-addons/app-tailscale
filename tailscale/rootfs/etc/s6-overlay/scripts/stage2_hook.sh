@@ -131,12 +131,12 @@ fi
 #
 if bashio::config.true "userspace_networking"; then
     # Disable MagicDNS egress and ingress proxy related services when userspace_networking is enabled
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/magicdns-proxies-reconfigurator
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/magicdns-ingress-proxy
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/magicdns-proxies-reconfigurator
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/magicdns-ingress-proxy
     rm /etc/s6-overlay/s6-rc.d/tailscaled/dependencies.d/magicdns-egress-proxy
 elif bashio::config.false "accept_dns"; then
     # Disable MagicDNS egress and ingress proxy reconfigurator when userspace_networking is disabled but accept_dns is also disabled
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/magicdns-proxies-reconfigurator
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/magicdns-proxies-reconfigurator
 fi
 
 # Disable protect-subnets service when userspace-networking is enabled or accepting routes is disabled
@@ -153,20 +153,20 @@ fi
 
 # Disable forwarding service when userspace-networking is enabled
 if bashio::config.true "userspace_networking"; then
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/forwarding
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/forwarding
 fi
 
 # Disable mss-clamping service when userspace-networking is enabled
 if bashio::config.true "userspace_networking"; then
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/mss-clamping
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/mss-clamping
 fi
 
 # Disable taildrop service when it has been explicitly disabled
 if bashio::config.false 'taildrop'; then
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/taildrop
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/taildrop
 fi
 
 # Disable share-homeassistant service when it has been explicitly disabled
 if bashio::config.equals 'share_homeassistant' 'disabled'; then
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/share-homeassistant
+    rm /etc/s6-overlay/user-bundles.d/user/contents.d/share-homeassistant
 fi

@@ -7,6 +7,13 @@
 
 declare current_config
 
+declare non_importable_services
+declare importable_services
+declare -A service_protocols=()
+declare -a service_config_args
+declare service_config
+declare anything_imported=false
+
 declare service
 declare service_name
 declare target
@@ -38,6 +45,110 @@ fi
 # Read configured services from app configuration
 # Note: bashio::config emits one JSON object per line for array options
 readarray -t configured_services < <(bashio::config 'services')
+
+# Importing current Tailscale Services configuration to the new services option on first start
+# This can't be done in stage2_hook, this requires a running tailscaled
+if ! bashio::fs.file_exists "/data/services_import_is_done"; then
+  # This is intentionally done at the beginning, import will be tried only once, even in case of errors
+  touch "/data/services_import_is_done"
+
+  bashio::log.info "Importing Tailscale Services configuration to the new services option..."
+
+  # Filtering for non-importable services
+  if non_importable_services=$(bashio::jq "${current_config}" '
+    .Services // {} | to_entries[] | .key as $name
+    | .value.Web | to_entries[] | (.key | split(":")[1]) as $port
+    | .value.Handlers | to_entries[] | .key as $path
+    | .value | to_entries[] | select(.key!="Proxy")
+    | { "name": $name, "port": $port, "path": $path, "target-type": .key, "target": .value }' \
+    -e)
+  then
+    bashio::log.warning "There are currently configured Tailscale Services that can't be imported to the new services option:"
+    jq -C <<<"${non_importable_services}"
+  fi
+
+  # Filtering for importable services
+  if importable_services=$(bashio::jq "${current_config}" '
+    .Services // {} | to_entries[] | .key as $name
+    | .value.Web | to_entries[] | (.key | split(":")[1]) as $port
+    | .value.Handlers | to_entries[] | .key as $path
+    | .value | to_entries[] | select(.key=="Proxy")
+    | { "name": $name, "port": $port, "path": $path, "target": .value }' \
+    -e)
+  then
+    bashio::log.info "There are currently configured Tailscale Services that will be imported to the new services option:"
+    jq -C <<<"${importable_services}"
+
+    # Collect protocols for the service ports
+    eval "declare -A service_protocols=($(bashio::jq "${current_config}" '
+      .Services // {} | to_entries[] | .key as $name
+      | .value.TCP | to_entries[]
+      | { "name": $name, "port": .key, "protocol": [.value | to_entries[] | select(.value)][0] | .key | ascii_downcase }
+      | @sh "[\(.name+"|"+.port)]=\(.protocol)"'
+    ))"
+
+    # Import services
+    while IFS= read -r service
+    do
+      service_name=$(bashio::jq "${service}" '.name')
+      target=$(bashio::jq "${service}" '.target')
+      port=$(bashio::jq "${service}" '.port')
+      path=$(bashio::jq "${service}" '.path')
+      protocol="${service_protocols["${service_name}|${port}"]}"
+
+      # Replace any localhost or 127.1.2.3 addresses with 127.0.0.1
+      target=${target/:*:/://127.0.0.1:}
+
+      # Remove the default '/' path
+      if bashio::var.equals "${path}" '/'; then
+        path=''
+      fi
+
+      bashio::log.info \
+        "Importing service host configuration for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})"
+
+      # Create service config JSON
+      service_config_args=()
+      service_config_args+=("name")
+      service_config_args+=("${service_name}")
+      service_config_args+=("target")
+      service_config_args+=("${target}")
+      service_config_args+=("protocol")
+      service_config_args+=("${protocol}")
+      service_config_args+=("port")
+      service_config_args+=("^${port}")
+      if bashio::var.has_value "${path}"; then
+        service_config_args+=("path")
+        service_config_args+=("${path}")
+      fi
+      service_config="$(bashio::var.json "${service_config_args[@]}")"
+
+      if [[ " ${configured_services[*]} " =~ " ${service_config} " ]]; then
+        bashio::log.notice \
+          "Service host configuration for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})" \
+          "is already present in the services option, skipping import"
+      else
+        configured_services+=("${service_config}")
+        anything_imported=true
+      fi
+    done <<<"$(bashio::jq "${importable_services}")"
+  fi
+
+  if ! bashio::var.true "${anything_imported}"; then
+    bashio::log.info "Nothing to import to the new services option"
+  else
+    # sed is there to remove the single empty line output on success
+    bashio::try bashio::app.option 'services' "^$(bashio::jq "${configured_services[*]}" '.' -s)" | sed -e "/^$/d"
+    if bashio::try.failed; then
+      bashio::log.warning "Tailscale Services configuration can't be imported to the new services option"
+      bashio::log.warning "You have to manually configure services based on the current configuration logged above in JSON"
+      # Reread configured services
+      readarray -t configured_services < <(bashio::config 'services')
+    else
+      bashio::log.info "Successfully imported Tailscale Services to the new services option"
+    fi
+  fi
+fi
 
 # Validate all services.protocol values
 if protocol=$( \

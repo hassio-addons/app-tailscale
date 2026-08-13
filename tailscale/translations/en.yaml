@@ -85,15 +85,21 @@ configuration:
       name:
         name: Service name
         description: >-
-          The service name must include the `svc:` prefix.
+          Must include the `svc:` prefix.
       target:
         name: Target
         description: >-
-          Must be a local address (127.0.0.1) reachable from this app.
+          Must be a local address reachable from this app. Use `http://` or
+          `https://` targets for HTTP/HTTPS protocols, and `tcp://` targets for TCP and
+          tls-terminated-tcp protocols, for example `http://127.0.0.1:13378`.
       protocol:
         name: Protocol
         description: >-
-          The protocol with which the target will be presented.
+          The protocol by which the target will be presented.
+          Note: For `https` and `tls-terminated-tcp` protocols you must enable
+          MagicDNS and HTTPS certificates for your tailnet on the DNS
+          page of the admin console first. Once enabled, Tailscale
+          automatically provisions a TLS certificate for the service.
       port:
         name: Port
         description: >-
@@ -102,7 +108,7 @@ configuration:
         name: Path
         description: >-
           The path where the target will be exposed.
-          Optional, defaults to '/', and can be used only for the HTTP/HTTPS protocols.
+          Optional, defaults to `/`, and can be used only for the HTTP/HTTPS protocols.
   snat_subnet_routes:
     name: Source NAT subnet routes
     description: >-

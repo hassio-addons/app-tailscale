@@ -350,23 +350,26 @@ name.
   `https://` targets for HTTP/HTTPS protocols, and `tcp://` targets for TCP and
   tls-terminated-tcp protocols, for example `http://127.0.0.1:13378`.
 
-- Supported protocols:
+- Supported protocols by which the target will be presented:
+
+  **Note:** For `https` and `tls-terminated-tcp` protocols you must enable
+  MagicDNS and HTTPS certificates for your tailnet on the [DNS
+  page][tailscale_dns] of the admin console first. Once enabled, Tailscale
+  automatically provisions a TLS certificate for the service.
 
   - `http`: Expose the service as an HTTP server on the configured port.
 
   - `https`: Expose the service as an HTTPS server on the configured port.
-
-    **Note:** You must enable MagicDNS and HTTPS certificates for your tailnet
-    on the [DNS page][tailscale_dns] of the admin console first. Once enabled,
-    Tailscale automatically provisions a TLS certificate for the service.
 
   - `tcp`: Forward raw TCP packets to the configured target.
 
   - `tls-terminated-tcp`: Forward TLS-terminated TCP packets to the configured
     target.
 
-- The `path` is optional, defaults to `/`, and can be used only for the
-  HTTP/HTTPS protocols.
+- The `port` is where the target will be exposed.
+
+- The `path` is where the target will be exposed. Optional, defaults to `/`, and
+  can be used only for the HTTP/HTTPS protocols.
 
 Before a service can accept traffic:
 

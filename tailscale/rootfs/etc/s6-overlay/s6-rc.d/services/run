@@ -56,11 +56,14 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
 
   # Filtering for non-importable services
   if non_importable_services=$(bashio::jq "${current_config}" '
-    .Services // {} | to_entries[] | .key as $name
-    | .value.Web | to_entries[] | (.key | split(":")[1]) as $port
-    | .value.Handlers | to_entries[] | .key as $path
-    | .value | to_entries[] | select(.key!="Proxy")
-    | { "name": $name, "port": $port, "path": $path, "target-type": .key, "target": .value }' \
+    .Services // {} | to_entries[] | .key as $name | .value as $service
+    | ($service.Web // {} | to_entries[] | (.key | split(":")[1]) as $port
+      | .value.Handlers | to_entries[] | .key as $path
+      | .value | to_entries[] | select(.key != "Proxy")
+      | { "name": $name, "port": $port, "path": $path, "target-type": .key, "target": .value })
+    , ($service.TCP // {} | to_entries[] | .key as $port
+      | .value | to_entries[] | select(.key | IN("HTTP", "HTTPS", "TCPForward", "TerminateTLS") | not)
+      | { "name": $name, "port": $port,                "target-type": .key, "target": .value })' \
     -e)
   then
     bashio::log.warning "There are currently configured Tailscale Services that can't be imported to the new services option:"
@@ -69,11 +72,14 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
 
   # Filtering for importable services
   if importable_services=$(bashio::jq "${current_config}" '
-    .Services // {} | to_entries[] | .key as $name
-    | .value.Web | to_entries[] | (.key | split(":")[1]) as $port
-    | .value.Handlers | to_entries[] | .key as $path
-    | .value | to_entries[] | select(.key=="Proxy")
-    | { "name": $name, "port": $port, "path": $path, "target": .value }' \
+    .Services // {} | to_entries[] | .key as $name | .value as $service
+    | ($service.Web // {} | to_entries[] | (.key | split(":")[1]) as $port
+      | .value.Handlers | to_entries[] | .key as $path
+      | .value | to_entries[] | select(.key == "Proxy")
+      | { "name": $name, "port": $port, "path": $path, "target": .value })
+    , ($service.TCP // {} | to_entries[] | .key as $port
+      | .value | to_entries[] | select(.key == "TCPForward")
+      | { "name": $name, "port": $port,                "target": "tcp://"+.value })' \
     -e)
   then
     bashio::log.info "There are currently configured Tailscale Services that will be imported to the new services option:"
@@ -82,8 +88,10 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
     # Collect protocols for the service ports
     eval "declare -A service_protocols=($(bashio::jq "${current_config}" '
       .Services // {} | to_entries[] | .key as $name
-      | .value.TCP | to_entries[]
-      | { "name": $name, "port": .key, "protocol": [.value | to_entries[] | select(.value)][0] | .key | ascii_downcase }
+      | .value.TCP | to_entries[] | .key as $port | (.value | has("TerminateTLS")) as $tls_terminated
+      | .value | to_entries[] | select(.key | IN("HTTP", "HTTPS", "TCPForward"))
+      | { "name": $name, "port": $port,
+        "protocol": if .key == "TCPForward" then if $tls_terminated then "tls-terminated-tcp" else "tcp" end else .key | ascii_downcase end }
       | @sh "[\(.name+"|"+.port)]=\(.protocol)"'
     ))"
 
@@ -93,7 +101,7 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
       service_name=$(bashio::jq "${service}" '.name')
       target=$(bashio::jq "${service}" '.target')
       port=$(bashio::jq "${service}" '.port')
-      path=$(bashio::jq "${service}" '.path')
+      path=$(bashio::jq "${service}" '.path // empty')
       protocol="${service_protocols["${service_name}|${port}"]}"
 
       # Replace any localhost or 127.1.2.3 addresses with 127.0.0.1

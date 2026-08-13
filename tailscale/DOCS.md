@@ -344,7 +344,7 @@ You can use this option to expose an app running on your Home Assistant
 instance, such as an audiobookshelf app, to your tailnet using a stable MagicDNS
 name.
 
-- The service name must include the `svc:` prefix.
+- The service `name` must include the `svc:` prefix.
 
 - The `target` must be a local address reachable from this app. Use `http://` or
   `https://` targets for HTTP/HTTPS protocols, and `tcp://` targets for TCP and
@@ -365,7 +365,8 @@ name.
   - `tls-terminated-tcp`: Forward TLS-terminated TCP packets to the configured
     target.
 
-- The `path` option is optional and defaults to `/`.
+- The `path` is optional, defaults to `/`, and can be used only for the
+  HTTP/HTTPS protocols.
 
 Before a service can accept traffic:
 

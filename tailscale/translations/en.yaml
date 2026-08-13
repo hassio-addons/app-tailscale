@@ -102,7 +102,7 @@ configuration:
         name: Path
         description: >-
           The path where the target will be exposed.
-          Optional, defaults to '/'.
+          Optional, defaults to '/', and can be used only for the HTTP/HTTPS protocols.
   snat_subnet_routes:
     name: Source NAT subnet routes
     description: >-

@@ -7,7 +7,7 @@
 
 # Note: This service runs when userspace_networking is disabled
 
-# Sets up IPv4 and IPv6 ingress DNS proxy for MagicDNS, that inercepts queries from hassio DNS and SU.
+# Sets up IPv4 and IPv6 ingress DNS proxy for MagicDNS, that intercepts queries from hassio DNS and SU.
 
 readonly MAGIC_DNS_IPV4="100.100.100.100"
 

@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs the dnsmasq proxies initialization
@@ -11,6 +10,11 @@ readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
 
 declare dns
 declare invalid_dns_config
+
+# MAGICDNS_MODE is in contenv at /var/run/s6/container_environment
+# - "RESTRICTED"   only domains in black-white-list are allowed on ingress side, everything else on egress side
+# - "UNRESTRICTED" everything except domains in black-white-list are allowed on ingress side, only domains in black-white-list on egress side
+readonly DNSMASQ_BLACK_WHITE_LIST_LOCATION="/run/dnsmasq_black_white_list"
 
 # Check DNS configuration
 invalid_dns_config="true"
@@ -34,7 +38,8 @@ for dns in $(bashio::dns.locals); do
   if bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV4}" || \
     bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV6}"
   then
-    bashio::log.fatal "Do not configure MagicDNS's IP address (${dns:6}) as DNS server under Settings -> System -> Network"
+    bashio::log.fatal \
+      "Do not configure MagicDNS's IP address (${dns:6}) as DNS server under Settings -> System -> Network"
     invalid_dns_config="true"
   fi
 done
@@ -44,6 +49,8 @@ fi
 
 # This is necessary to prevent accessing MagicDNS before the ingress proxy starts up
 # The ingress proxy will remove these entries on startup
-# In case of accept_dns enabled, this will prevent DNS query loops
-# In case of accept_dns disabled, this will prevent SERVFAIL logging by MagicDNS for non-tailnet queries
 magicdns-ingress-proxy-forwarding setup drop
+
+# During startup allow all egress queries, this will be reevaluated before ingress proxy starts
+printf 'RESTRICTED' > /var/run/s6/container_environment/MAGICDNS_MODE
+printf '' > "${DNSMASQ_BLACK_WHITE_LIST_LOCATION}"

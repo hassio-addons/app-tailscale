@@ -1,18 +1,23 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs after the machine has been logged in into the Tailscale network
 # ==============================================================================
+
+shopt -s extglob
+
 declare interface
 declare -a options
 declare -a routes=()
 declare route
 declare -a colliding_routes=()
 declare login_server
-declare tags
+declare advertise_tags
 declare keyexpiry
+declare error_message
+declare backend_state
+declare nostate_started_timestamp
 
 # Default options
 options+=(--hostname "$(bashio::info.hostname)")
@@ -35,7 +40,9 @@ fi
 if bashio::config.true "advertise_exit_node" && \
   bashio::config.has_value "exit_node"
 then
-  bashio::exit.nok "You can't advertise this device as an exit node and at the same time specify an exit node to use"
+  bashio::exit.nok \
+    "You can't advertise this device as an exit node and at the same time specify an exit node to use." \
+    "Please check your configuration based on the app's documentation under \"Option: advertise_exit_node\" and \"Option: exit_node\"."
 fi
 
 # Advertise as exit node when explicitly enabled
@@ -81,8 +88,8 @@ else
 fi
 
 # Get configured tags
-tags=$(bashio::config "tags | join(\",\")")
-options+=(--advertise-tags="${tags}")
+advertise_tags=$(bashio::config "advertise_tags | join(\",\")")
+options+=(--advertise-tags="${advertise_tags}")
 
 # Advertise subnet routes
 readarray -t routes < <(subnet-routes advertised)
@@ -90,17 +97,41 @@ IFS=","
 options+=(--advertise-routes="${routes[*]}")
 unset IFS
 
-# Wait for the network to be available and logged in
+# Wait for the network to be available
+# Loop here while BackendState is:
+# - Starting
+# - NoState (first time connecting to control) for less than 30s, to handle potential startup transients
+# Move on to tailscale up, when BackendState is:
+# - NoState (first time connecting to control) for more than 30s
+# - Stopped (result of a manual tailscale down command)
+# - NeedsLogin
+# - NeedsMachineAuth
+# - Running
+# Note: {} is used instead of () to achieve && precedence over || without subshell,
+#   subshell would not update the value of nostate_started_timestamp here
 while ! bashio::fs.socket_exists "/var/run/tailscale/tailscaled.sock" || \
-  ! /opt/tailscale status --json --peers=false --self=false \
-    | jq --exit-status '.BackendState == "Running" or .BackendState == "NeedsLogin" or .BackendState == "Stopped"' > /dev/null;
+  ! backend_state=$( \
+    /opt/tailscale status --json --peers=false --self=false \
+    | jq -rcM '.BackendState') || \
+  [[ ! "${backend_state}" = @(NoState|Stopped|NeedsLogin|NeedsMachineAuth|Running) ]] || \
+  { [[ "${backend_state}" == "NoState" ]] && \
+    (( $(date +"%s") - ${nostate_started_timestamp:=$(date +"%s")} < 30 )) }
 do
   sleep 2
 done
 
 # Start Tailscale
-if ! /opt/tailscale up "${options[@]}"; then
-  bashio::exit.nok "Unable to start up Tailscale"
+# Capture stderr in a variable but write it to the log also
+if ! { error_message=$(/opt/tailscale up "${options[@]}" 2> >(tee /dev/fd/2) 1>&3); } 3>&1; then
+  if [[ $error_message != *"can't change --login-server without --force-reauth"* ]]; then
+    bashio::exit.nok "Unable to start up Tailscale"
+  fi
+  # Execute this only, if tailscale up explicitly complained about this
+  bashio::log.warning "The login server option has changed, forcing reauthentication"
+  options+=(--force-reauth)
+  if ! /opt/tailscale up "${options[@]}"; then
+    bashio::exit.nok "Unable to start up Tailscale"
+  fi
 fi
 
 # Wait for the network to be available and logged in
@@ -141,7 +172,7 @@ fi
 if keyexpiry=$(/opt/tailscale status --self=true --peers=false --json | jq -rce '.Self.KeyExpiry'); then
   bashio::log.warning "The connection's key will expire on: ${keyexpiry}"
   bashio::log.warning "Consider disabling key expiry to avoid losing connection to your Home Assistant device."
-  bashio::log.warning "Please check your configuration based on the app's documentation under \"Configuration\""
+  bashio::log.warning "Please check your configuration based on the app's documentation under the \"Configuration\" section."
 fi
 
 # Warn about colliding subnet routes if non-userspace networking and accepting routes are enabled

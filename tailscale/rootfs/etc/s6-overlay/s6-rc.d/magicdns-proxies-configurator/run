@@ -1,0 +1,12 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Runs the dnsmasq proxies black/white list initialization
+# ==============================================================================
+
+configure-magicdns-proxies
+
+# Restart the egress proxy, the configuration is changed
+bashio::log.info "MagicDNS proxy configuration has changed, restarting MagicDNS egress proxy..."
+s6-svc -ruwR /run/service/magicdns-egress-proxy

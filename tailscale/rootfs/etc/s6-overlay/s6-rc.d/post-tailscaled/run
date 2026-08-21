@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs after the machine has been logged in into the Tailscale network
@@ -14,7 +13,7 @@ declare -a routes=()
 declare route
 declare -a colliding_routes=()
 declare login_server
-declare tags
+declare advertise_tags
 declare keyexpiry
 declare error_message
 declare backend_state
@@ -87,8 +86,8 @@ else
 fi
 
 # Get configured tags
-tags=$(bashio::config "tags | join(\",\")")
-options+=(--advertise-tags="${tags}")
+advertise_tags=$(bashio::config "advertise_tags | join(\",\")")
+options+=(--advertise-tags="${advertise_tags}")
 
 # Advertise subnet routes
 readarray -t routes < <(subnet-routes advertised)
@@ -171,7 +170,7 @@ fi
 if keyexpiry=$(/opt/tailscale status --self=true --peers=false --json | jq -rce '.Self.KeyExpiry'); then
   bashio::log.warning "The connection's key will expire on: ${keyexpiry}"
   bashio::log.warning "Consider disabling key expiry to avoid losing connection to your Home Assistant device."
-  bashio::log.warning "Please check your configuration based on the app's documentation under \"Configuration\""
+  bashio::log.warning "Please check your configuration based on the app's documentation under the \"Configuration\" section."
 fi
 
 # Warn about colliding subnet routes if non-userspace networking and accepting routes are enabled

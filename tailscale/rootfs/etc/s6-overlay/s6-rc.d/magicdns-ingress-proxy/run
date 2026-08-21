@@ -1,23 +1,27 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs the MagicDNS ingress proxy
 # ==============================================================================
 
-# Note: This service runs when userspace_networking is disabled, and
-# - when accept_dns is enabled, it treats black_white_list as black_list, and
-#   returns NXDOMAIN for anything that is on the list
-# - when accept_dns is disabled, it treats black_white_list as white_list, and
-#   returns NXDOMAIN for anything that is NOT on the list
+# Note: This service runs when userspace_networking is disabled
 
-source /usr/lib/trace.sh
+# Sets up IPv4 and IPv6 ingress DNS proxy for MagicDNS, that intercepts queries from hassio DNS and SU.
 
 readonly MAGIC_DNS_IPV4="100.100.100.100"
 
-readonly DNSMASQ_INGRESS_PORT=53
-readonly DNSMASQ_BLACK_WHITE_LIST_LOCATION="/etc/dnsmasq-black-white-list"
+readonly DNSMASQ_INGRESS_DEFAULT_PORT=51100
+
+# MAGICDNS_MODE is in contenv at /var/run/s6/container_environment
+# - "RESTRICTED"   only domains in black-white-list are allowed on ingress side, everything else on egress side
+# - "UNRESTRICTED" everything except domains in black-white-list are allowed on ingress side, only domains in black-white-list on egress side
+readonly DNSMASQ_BLACK_WHITE_LIST_LOCATION="/run/dnsmasq_black_white_list"
+
+# updated by the magicdns-proxies-reconfigurator service
+readonly MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION="/run/magicdns_ingress_proxy_suppress_forwarding_configuration"
+# used by the magicdns-proxies-reconfigurator service
+readonly DNSMASQ_INGRESS_PORT_LOCATION="/run/dnsmasq_ingress_port"
 
 declare tailscale_address_ipv4
 declare tailscale_address_ipv6
@@ -25,8 +29,20 @@ declare -a black_list
 declare -a white_list
 declare domain
 declare -a options
+declare dnsmasq_ingress_port
 
 bashio::log.info "Starting MagicDNS ingress proxy..."
+
+# Search for unallocated port in case of collision
+dnsmasq_ingress_port="${DNSMASQ_INGRESS_DEFAULT_PORT}"
+while netstat -lntu \
+  | awk '{print $4}' \
+  | grep -q ":${dnsmasq_ingress_port}$"
+do
+  if ((++dnsmasq_ingress_port >= DNSMASQ_INGRESS_DEFAULT_PORT + 1000)); then
+    bashio::exit.nok "Can't find free port for MagicDNS ingress proxy"
+  fi
+done
 
 options+=(--no-hosts)
 options+=(--no-resolv)
@@ -51,39 +67,56 @@ if bashio::var.has_value "${tailscale_address_ipv6-}"; then
   options+=(--listen-address=${tailscale_address_ipv6})
 fi
 
+# on a non-lo interface this bind-dynamic option has the effect that dnsmasq connects only to the specified address
+# this is intentionally different from the egress proxy, where on the lo interface bind-interfaces option has the same effect
+# and on the lo interface bind-interfaces option doesn't result in a logged warning
 options+=(--bind-dynamic)
-options+=(--port=${DNSMASQ_INGRESS_PORT})
+options+=(--port=${dnsmasq_ingress_port})
 
-if bashio::config.true "accept_dns"; then
-  # Black-list
-  readarray -t black_list < "${DNSMASQ_BLACK_WHITE_LIST_LOCATION}"
+if bashio::var.equals "${MAGICDNS_MODE}" "RESTRICTED"; then
+  # Only domains in black-white-list are allowed
 
-  # Forward everything to MagicDNS, except the black_list
-  options+=(--server=${MAGIC_DNS_IPV4})
-  for domain in "${black_list[@]}"; do
-    options+=(--server=/${domain}/)
-  done
-else
   # White-list
   readarray -t white_list < "${DNSMASQ_BLACK_WHITE_LIST_LOCATION}"
 
   # Return NXDOMAIN for everything, except the white_list
+  bashio::log.info "MagicDNS ingress proxy: returning NXDOMAIN for everything${white_list:+, except forwarding to ${MAGIC_DNS_IPV4} in case of:}"
   options+=(--address=/#/)
   for domain in "${white_list[@]}"; do
+    bashio::log.info "  ${domain}"
     options+=(--server=/${domain}/${MAGIC_DNS_IPV4})
   done
+elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
+  # Everything except domains in black-white-list are allowed
+
+  # Black-list
+  readarray -t black_list < "${DNSMASQ_BLACK_WHITE_LIST_LOCATION}"
+
+  # Forward everything to MagicDNS, except the black_list
+  bashio::log.info "MagicDNS ingress proxy: forwarding everything to ${MAGIC_DNS_IPV4}${black_list:+, except}"
+  options+=(--server=${MAGIC_DNS_IPV4})
+  for domain in "${black_list[@]}"; do
+    bashio::log.info "  ${domain}"
+    options+=(--server=/${domain}/)
+  done
+else
+  bashio::exit.nok "Invalid MAGICDNS_MODE: '${MAGICDNS_MODE}'"
 fi
 
-if bashio_custom::trace; then
+if bashio::trace; then
   options+=(--log-queries)
   options+=(--log-debug)
 fi
 
-magicdns-ingress-proxy-forwarding setup forwarding
-magicdns-ingress-proxy-forwarding remove drop
+if ! bashio::fs.file_exists "${MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION}"; then
+  magicdns-ingress-proxy-forwarding setup forwarding "${dnsmasq_ingress_port}"
+  magicdns-ingress-proxy-forwarding remove drop
+else
+  printf "${dnsmasq_ingress_port}" > "${DNSMASQ_INGRESS_PORT_LOCATION}"
+fi
 
 # We need to delay the starting of the dependent services until iptables are configured
 echo "" >&3
+exec 3>&-
 
-# This DNS replies NXDOMAIN for the black_list, otherwise forwards everything to MagicDNS
 exec dnsmasq "${options[@]}"

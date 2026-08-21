@@ -1,12 +1,9 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
-# Prevent local subnets to be routed toward the tailnet
+# Runs the nm-dispatcher service
 # ==============================================================================
-
-protect-subnet-routes
 
 # runs scripts in /etc/NetworkManager/dispatcher.d
 # --debug is used to prevent logging to syslog (HA cli)

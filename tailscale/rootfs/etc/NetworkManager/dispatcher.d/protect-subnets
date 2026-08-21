@@ -1,6 +1,5 @@
 #!/command/with-contenv-merge bashio
 # shellcheck shell=bash
-export LOG_FD
 # The shebang 'with-contenv-merge' above is identical with 'with-contenv', but doesn't clear the current environment containing the dispatcher variables
 
 readonly NM_DISPATCHER_LISTENER_QUEUE=/run/nm-dispatcher-listener-queue

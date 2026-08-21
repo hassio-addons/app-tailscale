@@ -2,12 +2,12 @@
 # shellcheck shell=bash
 # ==============================================================================
 # Home Assistant Community App: Tailscale
-# Take down the S6 supervision tree when nm-dispatcher fails
+# Take down the S6 supervision tree when MagicDNS proxies reconfigurator fails
 # ==============================================================================
 readonly exit_code_container=$(</run/s6-linux-init-container-results/exitcode)
 readonly exit_code_service="${1}"
 readonly exit_code_signal="${2}"
-readonly service="nm-dispatcher"
+readonly service="magicdns-proxies-reconfigurator"
 
 bashio::log.info \
   "Service ${service} exited with code ${exit_code_service}" \

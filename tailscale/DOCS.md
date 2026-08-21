@@ -40,11 +40,6 @@ however, it is nice to know where you need to go later on.
 
 ## Configuration
 
-The app by default exposes "Exit Node" capabilities that you can enable from
-your Tailscale account. Additionally, if the Supervisor managed your network
-(which is the default), the app will also advertise routes to your subnets on
-all supported interfaces to Tailscale.
-
 Consider disabling key expiry to avoid losing connection to your Home Assistant
 device. See [Key expiry][tailscale_info_key_expiry] for more information.
 
@@ -53,25 +48,18 @@ their interface.
 
 <https://login.tailscale.com/>
 
-1. Navigate to the [Machines page][tailscale_machines] of the admin console, and
-   find your Home Assistant instance.
-
-1. Click on the **&hellip;** icon at the right side and select the "Edit route
-   settings..." option. The "Exit node" and "Subnet routes" functions can be
-   enabled here.
-
-1. Click on the **&hellip;** icon at the right side and select the "Disable key
-   expiry" option.
-
 ```yaml
 accept_dns: true
-accept_routes: true
-advertise_exit_node: true
-advertise_connector: true
+accept_routes: false
+advertise_connector: false
+advertise_exit_node: false
 advertise_routes:
   - local_subnets
   - 192.168.1.0/24
   - fd12:3456:abcd::/64
+advertise_tags:
+  - tag:example
+  - tag:homeassistant
 always_use_derp: false
 exit_node: 100.101.102.103
 log_level: info
@@ -80,9 +68,6 @@ share_homeassistant: disabled
 share_on_port: 443
 snat_subnet_routes: true
 stateful_filtering: false
-tags:
-  - tag:example
-  - tag:homeassistant
 taildrive:
   local_apps: false
   app_configs: false
@@ -91,8 +76,8 @@ taildrive:
   media: false
   share: false
   ssl: false
-taildrop: true
-userspace_networking: true
+taildrop: false
+userspace_networking: false
 ```
 
 > [!NOTE]
@@ -119,22 +104,7 @@ your tailnet.
 
 More information: [Subnet routers][tailscale_info_subnets]
 
-This option is enabled by default.
-
-### Option: `advertise_exit_node`
-
-This option allows you to advertise this Tailscale instance as an exit node.
-
-By setting a device on your network as an exit node, you can use it to
-route all your public internet traffic as needed, like a consumer VPN.
-
-More information: [Exit nodes][tailscale_info_exit_nodes]
-
-This option is enabled by default.
-
-**Note:** You can't advertise this device as an exit node and at the same time
-specify an exit node to use. See also the "Option: `exit_node`" section of this
-documentation.
+This option is disabled by default.
 
 ### Option: `advertise_connector`
 
@@ -150,7 +120,32 @@ all nodes on the tailnet will use that IP address for their traffic egress.
 
 More information: [App connectors][tailscale_info_app_connectors]
 
-This option is enabled by default.
+This option is disabled by default.
+
+### Option: `advertise_exit_node`
+
+This option allows you to advertise this Tailscale instance as an exit node.
+
+By setting a device on your network as an exit node, you can use it to
+route all your public internet traffic as needed, like a consumer VPN.
+
+More information: [Exit nodes][tailscale_info_exit_nodes]
+
+This option is disabled by default.
+
+**Note:** You can't advertise this device as an exit node and at the same time
+specify an exit node to use. See also the "Option: `exit_node`" section of this
+documentation.
+
+**Note:** After you enable this option, you also have to enable it on Tailscale's
+admin console.
+
+1. Navigate to the [Machines page][tailscale_machines] of the admin console, and
+   find your Home Assistant instance.
+
+1. Click on the **&hellip;** icon at the right side and select the "Edit route
+   settings..." option. The "Exit node" and "Subnet routes" functions can be
+   enabled here.
 
 ### Option: `advertise_routes`
 
@@ -160,13 +155,27 @@ your device is connected to) to other clients on your tailnet.
 By adding to the list the IP addresses and masks of the subnet routes, you can
 use it to make your devices on these subnets accessible within your tailnet.
 
-If you want to disable this option, specify an empty list in the configuration
-(`[]` in YAML).
+By adding `local_subnets` to the list, the app will advertise routes to your
+subnets on all supported interfaces.
 
 More information: [Subnet routers][tailscale_info_subnets]
 
-The app by default will advertise routes to your subnets on all supported
-interfaces by adding `local_subnets` to the list.
+**Note:** After you add subnets to this option, you also have to enable them on
+Tailscale's admin console.
+
+1. Navigate to the [Machines page][tailscale_machines] of the admin console, and
+   find your Home Assistant instance.
+
+1. Click on the **&hellip;** icon at the right side and select the "Edit route
+   settings..." option. The "Exit node" and "Subnet routes" functions can be
+   enabled here.
+
+### Option: `advertise_tags`
+
+This option allows you to specify specific tags for this Tailscale instance.
+They need to start with `tag:`.
+
+More information: [Tags][tailscale_info_tags]
 
 ### Option: `always_use_derp`
 
@@ -343,13 +352,6 @@ connection are dropped.
 
 This option is disabled by default.
 
-### Option: `tags`
-
-This option allows you to specify specific tags for this Tailscale instance.
-They need to start with `tag:`.
-
-More information: [Tags][tailscale_info_tags]
-
 ### Option: `taildrive`
 
 This option allows you to specify which Home Assistant directories you want to
@@ -367,21 +369,17 @@ This app supports [Tailscale's Taildrop][tailscale_info_taildrop] feature,
 which allows you to send files to your Home Assistant instance from other
 Tailscale devices.
 
-This option is enabled by default.
+This option is disabled by default.
 
 Received files are stored in the `/share/taildrop` directory.
 
 ### Option: `userspace_networking`
 
-The app uses [userspace networking mode][tailscale_info_userspace_networking]
-to make your Home Assistant instance (and optionally the local subnets)
-accessible within your tailnet.
+When enabled, Tailscale will not create a `tailscale0` network interface on your
+host, i.e. you get one-way access from tailnet clients to your Home Assistant
+instance (and optionally the local subnets).
 
-This option is enabled by default.
-
-If you need to access other clients on your tailnet from your Home Assistant
-instance, disable userspace networking mode, which will create a `tailscale0`
-network interface on your host.
+This option is disabled by default.
 
 To be able to address other clients on your tailnet not only by their tailnet IP
 but also by their tailnet name, see the "DNS" section of this documentation.
@@ -389,7 +387,11 @@ but also by their tailnet name, see the "DNS" section of this documentation.
 If you want to access other clients on your tailnet even from your local subnet,
 follow steps in the [Site-to-site networking][tailscale_info_site_to_site] guide
 (Note: The app already handles "IP address forwarding" and "Clamp the MSS to
-the MTU" for you).
+the MTU" for you). See also the "Option: `snat_subnet_routes`" section of this
+documentation.
+
+More information: [Userspace networking
+mode][tailscale_info_userspace_networking]
 
 **Note:** In case your local subnets collide with subnet routes within your
 tailnet, your local network access has priority, and these addresses won't be
@@ -397,15 +399,6 @@ routed toward your tailnet. This will prevent your Home Assistant instance from
 losing network connection. This also means that using the same subnet on
 multiple nodes for load balancing and failover is impossible with the current
 app behavior.
-
-**Note:** The `userspace_networking` option can remain enabled if you only need
-one-way access from tailnet clients to your local subnet, without requiring
-access from your local subnet to other tailnet clients.
-
-**Note:** If you implement Site-to-site networking, but you are not interested
-in the real source IP address, i.e. subnet devices can see the traffic
-originating from the subnet router, you don't need to disable the
-`snat_subnet_routes` option, this can simplify routing configuration.
 
 ## Network
 

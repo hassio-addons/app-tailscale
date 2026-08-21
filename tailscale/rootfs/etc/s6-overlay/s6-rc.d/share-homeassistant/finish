@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Take down the S6 supervision tree when share-homeassistant fails
@@ -15,7 +14,7 @@ bashio::log.info \
   "(by signal ${exit_code_signal})"
 
 if [[ "${exit_code_service}" -eq 256 ]]; then
-  if [[ "${exit_code_container}" -eq 0 ]]; then
+  if [[ "${exit_code_signal}" -ne 15 && "${exit_code_container}" -eq 0 ]]; then
     echo $((128 + $exit_code_signal)) > /run/s6-linux-init-container-results/exitcode
   fi
   [[ "${exit_code_signal}" -eq 15 ]] && exec /run/s6/basedir/bin/halt
@@ -23,5 +22,9 @@ elif [[ "${exit_code_service}" -ne 0 ]]; then
   if [[ "${exit_code_container}" -eq 0 ]]; then
     echo "${exit_code_service}" > /run/s6-linux-init-container-results/exitcode
   fi
-  exec /run/s6/basedir/bin/halt
+  if ! bashio::fs.file_exists /run/s6_has_started; then
+    exit 125
+  else
+    exec /run/s6/basedir/bin/halt
+  fi
 fi

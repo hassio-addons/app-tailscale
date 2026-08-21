@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Forward incoming tailnet connections to the host's primary interface
@@ -76,7 +75,7 @@ function setup_forwarding() {
   fi
 }
 
-if ! bashio::api.supervisor GET "/network/interface/default/info" false &> /dev/null; then
+if ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null"; then
   bashio::log.warning \
     "The host has no primary (default) interface, can't forward incoming tailnet connections to the host." \
     "Restart of the app is required after the issue is fixed!"

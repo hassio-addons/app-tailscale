@@ -42,11 +42,11 @@ ports:
   41641/udp: null
 options:
   accept_dns: true
-  accept_routes: true
-  advertise_exit_node: true
-  advertise_connector: true
-  advertise_routes:
-    - local_subnets
+  accept_routes: false
+  advertise_connector: false
+  advertise_exit_node: false
+  advertise_routes: []
+  advertise_tags: []
   always_use_derp: false
   log_level: info
   login_server: "https://controlplane.tailscale.com"
@@ -54,7 +54,6 @@ options:
   share_on_port: 443
   snat_subnet_routes: true
   stateful_filtering: false
-  tags: []
   taildrive:
     local_apps: false
     app_configs: false
@@ -63,15 +62,17 @@ options:
     media: false
     share: false
     ssl: false
-  taildrop: true
-  userspace_networking: true
+  taildrop: false
+  userspace_networking: false
 schema:
   accept_dns: bool
   accept_routes: bool
-  advertise_exit_node: bool
   advertise_connector: bool
+  advertise_exit_node: bool
   advertise_routes:
     - "match(^(?:local_subnets|(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\/(?:3[0-2]|[12]?\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+\\/(?:12[0-8]|(?:1[01]|[1-9]?)\\d))$)"
+  advertise_tags:
+    - "match(^tag:[a-zA-Z][a-zA-Z0-9-]*$)"
   always_use_derp: bool
   exit_node: "match(^(?:(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+|[a-fA-F\\d]{8}(?:-[a-fA-F\\d]{4}){3}-[a-fA-F\\d]{12}|auto:any)$)?"
   log_level: list(trace|debug|info|notice|warning|error|fatal)
@@ -80,8 +81,6 @@ schema:
   share_on_port: match(^(?:443|8443|10000)$)
   snat_subnet_routes: bool
   stateful_filtering: bool
-  tags:
-    - "match(^tag:[a-zA-Z][a-zA-Z0-9-]*$)"
   taildrive:
     local_apps: bool
     app_configs: bool

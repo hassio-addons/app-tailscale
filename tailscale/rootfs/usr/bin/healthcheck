@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 
 # Plain (non-json) tailscale status returns error when status is not Running or Starting, so eg. NeedsLogin and NeedsMachineAuth would make it unhealthy
 # The .Health json filter returns any problems, so even temporary health problems would make it unhealthy
@@ -11,9 +10,7 @@ export LOG_FD
 
 # Redirect outputs to the log (&1 and &2 are not initialized by Docker)
 exec &> /proc/1/fd/1
-if [[ "${LOG_FD:-}" =~ ^[0-9]+$ ]]; then
-  eval "exec ${LOG_FD}>&1" || true
-fi
+bashio::log.reinitialize_output
 
 readonly HEALTHCHECK_OFFLINE_TIMEOUT=300   # 5 minutes
 readonly HEALTHCHECK_RESTART_TIMEOUT=3600  # 1 hour
@@ -22,6 +19,9 @@ declare status_json
 declare backend_state is_self_online
 # STARTED_TIMESTAMP is in contenv at /var/run/s6/container_environment
 # LAST_ONLINE_TIMESTAMP is in contenv at /var/run/s6/container_environment
+
+# updated by the magicdns-proxies-reconfigurator service
+# MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE is in contenv at /var/run/s6/container_environment
 
 if ! bashio::var.has_value "${STARTED_TIMESTAMP-}"
 then
@@ -34,7 +34,8 @@ if status_json=$(/opt/tailscale status --json --self=true --peers=false 2> /dev/
   is_self_online=$(jq -r '.Self.Online' <<< "${status_json}")
 fi
 
-if bashio::var.equals "${backend_state-}" "Running" && bashio::var.true "${is_self_online-}"
+if bashio::var.equals "${backend_state-}" "Running" && bashio::var.true "${is_self_online-}" && \
+  ! bashio::var.equals "${MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE-}" 'UNHEALTHY'
 then
   LAST_ONLINE_TIMESTAMP=$(date +"%s")
   printf "${LAST_ONLINE_TIMESTAMP}" > /var/run/s6/container_environment/LAST_ONLINE_TIMESTAMP

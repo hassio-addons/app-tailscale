@@ -1,0 +1,71 @@
+#!/usr/bin/env bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Setup DNAT for outgoing MagicDNS queries toward egress dnsmasq proxy
+# ==============================================================================
+
+readonly DNSMASQ_EGRESS_ADDRESS_IPV4="127.100.100.100"
+
+function setup_forwarding() {
+  local cmd="${1}"
+  local proto="${2}"
+  local ip_version="${3}"
+  local address_bits="${4}"
+  local from_address="${5}"
+  local to_address="${6}"
+  local to_port="${7}"
+
+  bashio::log.info "Setting up forwarding for MagicDNS egress proxy (${proto}, ${ip_version})"
+  if ${cmd} -t nat -S OUTPUT \
+    | grep -Eq "^-A OUTPUT -d ${from_address//[\[\]]/}/${address_bits} -p ${proto} -m ${proto} --dport 53 -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):${to_port}$"
+  then
+    bashio::log.notice "Forwarding is already set for MagicDNS egress proxy (${proto}, ${ip_version})"
+  else
+    if ! ${cmd} -t nat -A OUTPUT -d "${from_address//[\[\]]/}" -p "${proto}" --dport 53 -j DNAT --to-destination "${to_address}:${to_port}"; then
+      bashio::exit.nok "Setting up forwarding for MagicDNS egress proxy is unsuccessful (${proto}, ${ip_version})"
+    fi
+  fi
+}
+
+function remove_forwarding() {
+  local cmd="${1}"
+  local ip_version="${2}"
+  local address_bits="${3}"
+  local from_address="${4}"
+  local to_address="${5}"
+
+  local variables
+  local proto
+  local to_port
+
+  for variables in $( \
+    ${cmd} -t nat -S OUTPUT \
+    | { grep -E "^-A OUTPUT -d ${from_address//[\[\]]/}/${address_bits} -p \S+ -m \S+ --dport 53 -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):\d+$" || true ;} \
+    | sed -nr 's/^.*?-p\s(\S+).*?:(\d+)$/\1|\2/p')
+  do
+    IFS='|' read -r proto to_port <<< "${variables}"
+    bashio::log.info "Removing forwarding for MagicDNS egress proxy (${proto}, ${ip_version})"
+    if ! ${cmd} -t nat -D OUTPUT -d "${from_address//[\[\]]/}" -p "${proto}" --dport 53 -j DNAT --to-destination "${to_address}:${to_port}"; then
+      bashio::log.warning "Removing forwarding for MagicDNS egress proxy is unsuccessful (${proto}, ${ip_version})"
+    fi
+  done
+}
+
+case "${1-}-${2-}" in
+  setup-forwarding)
+    if ! bashio::var.has_value "${3-}"; then
+      echo "Port is missing" 1>&2
+      echo "Usage: $(basename "$0") setup forwarding port" 1>&2
+      exit 1
+    fi
+    setup_forwarding "iptables" "udp" "IPv4" "32" "${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${3}"
+    setup_forwarding "iptables" "tcp" "IPv4" "32" "${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${3}"
+    ;;
+  remove-forwarding)
+    remove_forwarding "iptables" "IPv4" "32" "${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${DNSMASQ_EGRESS_ADDRESS_IPV4}"
+    ;;
+  *)
+    echo "Usage: $(basename "$0") setup|remove forwarding [port in case of setup forwarding]" 1>&2
+    exit 1
+    ;;
+esac

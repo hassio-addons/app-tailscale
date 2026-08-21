@@ -1,6 +1,5 @@
 #!/usr/bin/env bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Print possible subnet routes to stdout
 # ==============================================================================

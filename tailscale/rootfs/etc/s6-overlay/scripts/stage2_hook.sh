@@ -108,7 +108,7 @@ if bashio::var.true "${invalid_dns_config}"; then
         "Please check your configuration based on the app's documentation under the \"DNS\" section"
     bashio::log.warning \
         "After the issue is fixed you can disable userspace_networking option again and restart the app"
-    bashio::app.option 'userspace_networking' 'true'
+    bashio::app.option 'userspace_networking' '^true'
 fi
 
 # MagicDNS related service dependencies:

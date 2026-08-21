@@ -1,38 +1,20 @@
 #!/command/with-contenv-merge bashio
 # shellcheck shell=bash
-export LOG_FD
 # The shebang 'with-contenv-merge' above is identical with 'with-contenv', but doesn't clear the current environment containing the dispatcher variables
 
-# Redirect outputs to the log (&2 is already set up as pipe by s6)
-exec 1>&2
-if [[ "${LOG_FD:-}" =~ ^[0-9]+$ ]]; then
-  eval "exec ${LOG_FD}>&1" || true
-fi
+readonly NM_DISPATCHER_LISTENER_QUEUE=/run/nm-dispatcher-listener-queue
 
-function halt-app() {
-  bashio::log.error "Failed to protect subnet routes. Halting app to prevent network loss."
-  echo -n 1 > /run/s6-linux-init-container-results/exitcode
-  exec /run/s6/basedir/bin/halt
-}
+# Redirect outputs to the log (though &2 is already set up as pipe by s6)
+exec &> /proc/1/fd/1
+bashio::log.reinitialize_output
 
 case "${NM_DISPATCHER_ACTION}" in
-  up|down)
-    bashio::log.info "Handling Network Manager action ${DEVICE_IP_IFACE-} ${NM_DISPATCHER_ACTION}"
-    unprotect-subnet-routes
-    if ! protect-subnet-routes; then
-      # Better stop app than risking losing all network connections
-      halt-app
-    fi
-    ;;
-  dhcp4-change|dhcp6-change)
-    # Do anything only when the addresses are really changed
-    if [[ "$(unprotect-subnet-routes test)" != "$(protect-subnet-routes test)" ]]; then
-      bashio::log.info "Handling Network Manager action ${DEVICE_IP_IFACE-} ${NM_DISPATCHER_ACTION}"
-      unprotect-subnet-routes
-      if ! protect-subnet-routes tested; then
-        # Better stop app than risking losing all network connections
-        halt-app
-      fi
+  up|down|dhcp4-change|dhcp6-change)
+    bashio::log.debug "Received Network Manager action ${DEVICE_IP_IFACE-} ${NM_DISPATCHER_ACTION}"
+    if ! echo "${DEVICE_IP_IFACE-} ${NM_DISPATCHER_ACTION}" > "${NM_DISPATCHER_LISTENER_QUEUE}"; then
+      bashio::log.fatal "Failed to send nm-dispatcher action to listener. Halting app to prevent network loss."
+      echo -n 1 > /run/s6-linux-init-container-results/exitcode
+      exec /run/s6/basedir/bin/halt
     fi
     ;;
   connectivity-change)

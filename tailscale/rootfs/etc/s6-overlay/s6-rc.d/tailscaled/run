@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs tailscale
@@ -23,7 +22,7 @@ if ! bashio::debug ; then
 fi
 
 # Use configured UDP port
-udp_port=$(bashio::addon.port "41641/udp")
+udp_port=$(bashio::app.port "41641/udp")
 if bashio::var.has_value "${udp_port}"; then
   options+=(--port=${udp_port})
 fi

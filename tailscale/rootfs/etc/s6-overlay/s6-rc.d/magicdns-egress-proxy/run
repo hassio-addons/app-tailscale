@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs the MagicDNS egress proxy
@@ -117,5 +116,6 @@ fi
 
 # We need to delay the starting of the dependent services until iptables are configured and the conf file is written
 echo "" >&3
+exec 3>&-
 
 exec dnsmasq "${options[@]}"

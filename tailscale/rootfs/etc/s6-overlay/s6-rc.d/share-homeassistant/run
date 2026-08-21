@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Enables Tailscale Serve or Funnel feature to share Home Assistant
@@ -76,6 +75,7 @@ options+=(http://127.0.0.1:"$(bashio::core.port)")
 
 # This service can wait for HA for minutes, let notify S6 when we are really starting
 echo "" >&3
+exec 3>&-
 
 # Set up serve or funnel
 exec /opt/tailscale "${options[@]}"

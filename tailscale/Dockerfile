@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/base/amd64:20.0.2
+ARG BUILD_FROM=ghcr.io/hassio-addons/base/amd64:21.0.2
 # hadolint ignore=DL3006
 FROM ${BUILD_FROM}
 
@@ -7,21 +7,24 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Setup base
 ARG BUILD_ARCH=amd64
-ARG TAILSCALE_VERSION="v1.96.4"
+ARG TAILSCALE_VERSION="v1.102.3"
 RUN \
     apk add --no-cache \
-        bind-tools=9.20.22-r0 \
-        dnsmasq=2.91-r0 \
-        ethtool=6.15-r0 \
+        bind-tools=9.20.26-r0 \
+        dnsmasq=2.92_p2-r0 \
+        ethtool=7.0-r0 \
         ipcalc=1.0.3-r1 \
-        iproute2=6.17.0-r0 \
-        iptables=1.8.11-r1 \
-        nginx=1.28.3-r0 \
-        coreutils=9.8-r1 \
-        networkmanager=1.54.3-r0 \
+        iproute2=7.0.0-r0 \
+        iptables=1.8.13-r0 \
+        nginx=1.30.4-r1 \
+        coreutils=9.11-r0 \
+        networkmanager=1.52.2-r0 \
     \
     && ln -sf /sbin/xtables-nft-multi /sbin/ip6tables \
     && ln -sf /sbin/xtables-nft-multi /sbin/iptables \
+    \
+    && rm -f -r \
+        /usr/lib/NetworkManager/dispatcher.d \
     \
     && if [ "${BUILD_ARCH}" = "aarch64" ]; then ARCH="arm64"; fi \
     && if [ "${BUILD_ARCH}" = "amd64" ]; then ARCH="amd64"; fi \

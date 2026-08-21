@@ -1,13 +1,10 @@
 #!/command/with-contenv-merge bashio
 # shellcheck shell=bash
-export LOG_FD
 # The shebang 'with-contenv-merge' above is identical with 'with-contenv', but doesn't clear the current environment containing the dispatcher variables
 
 # Redirect outputs to the log (&2 is already set up as pipe by s6)
 exec 1>&2
-if [[ "${LOG_FD:-}" =~ ^[0-9]+$ ]]; then
-  eval "exec ${LOG_FD}>&1" || true
-fi
+bashio::log.reinitialize_output
 
 function halt-app() {
   bashio::log.error "Failed to protect subnet routes. Halting app to prevent network loss."

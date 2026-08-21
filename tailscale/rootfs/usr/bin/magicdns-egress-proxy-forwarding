@@ -1,6 +1,5 @@
 #!/usr/bin/env bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Setup DNAT for outgoing MagicDNS queries toward egress dnsmasq proxy
 # ==============================================================================

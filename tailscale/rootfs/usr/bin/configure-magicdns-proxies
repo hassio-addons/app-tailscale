@@ -1,6 +1,5 @@
 #!/usr/bin/env bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Configures the dnsmasq proxies black/white list
 # ==============================================================================

@@ -1,0 +1,9 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Mark that all other S6 services has already started
+# Required by finish script failure handling (halt or exit)
+# ==============================================================================
+
+touch /run/s6_has_started

@@ -1,0 +1,8 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Remove subnet protection
+# ==============================================================================
+
+unprotect-subnet-routes

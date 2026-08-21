@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs tailscale
@@ -18,12 +17,12 @@ options+=(--state=/data/tailscaled.state)
 options+=(--statedir=/data/state)
 
 # Opt out of client log upload to log.tailscale.io
-if ! bashio::debug ; then
+if bashio::config.false "log_upload"; then
   options+=(--no-logs-no-support)
 fi
 
 # Use configured UDP port
-udp_port=$(bashio::addon.port "41641/udp")
+udp_port=$(bashio::app.port "41641/udp")
 if bashio::var.has_value "${udp_port}"; then
   options+=(--port=${udp_port})
 fi
@@ -42,7 +41,7 @@ fi
 # Run Tailscale
 # If exists, resolv.dnsmasq.conf pointing to the dummy dnsmasq will be mounted in place of the real resolv.conf only for tailscaled
 # This will prevent the DNS at 100.100.100.100 to call back to hassio_dns causing a loop
-if ! bashio::fs.file_exists "/etc/resolv.dnsmasq.conf"; then
+if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
   # Running the regular way, no resolv.conf replacement
   if bashio::debug ; then
     exec /opt/tailscaled "${options[@]}"
@@ -56,7 +55,7 @@ if ! bashio::fs.file_exists "/etc/resolv.dnsmasq.conf"; then
 else
   # Using fake resolv.conf
   bashio::log.info "Using dnsmasq as upstream DNS server for tailscaled"
-  mv /etc/resolv.dnsmasq.conf /etc/resolv.for-tailscaled.conf
+  bashio::net.wait_for 53 $(awk '{ print $2 }' < /etc/resolv.for-tailscaled.conf)
   if bashio::debug ; then
     exec unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")"
   else

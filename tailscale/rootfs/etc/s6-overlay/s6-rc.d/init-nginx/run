@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Configures NGINX for use with the Tailscale web
@@ -8,8 +7,8 @@ export LOG_FD
 
 # Generate Ingress configuration
 bashio::var.json \
-    interface "$(bashio::addon.ip_address)" \
-    port "^$(bashio::addon.ingress_port)" \
+    interface "$(bashio::app.ip_address)" \
+    port "^$(bashio::app.ingress_port)" \
     | tempio \
         -template /etc/nginx/templates/ingress.gtpl \
         -out /etc/nginx/servers/ingress.conf

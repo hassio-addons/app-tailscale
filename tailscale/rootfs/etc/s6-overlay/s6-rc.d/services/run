@@ -1,0 +1,241 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Advertises configured Tailscale Services from this host
+# ==============================================================================
+
+declare current_config
+
+declare non_importable_services
+declare importable_services
+declare -A service_protocols=()
+declare -a service_config_args
+declare service_config
+declare anything_imported=false
+
+declare service
+declare service_name
+declare target
+declare protocol
+declare port
+declare path
+
+declare -a options=()
+declare -a configured_services=()
+declare -a configured_names=()
+declare -a current_names=()
+
+function drain_and_clear_service() {
+  local service_name=${1}
+
+  if ! /opt/tailscale serve drain "${service_name}"; then
+    bashio::log.warning "Failed to drain service host ${service_name}"
+  fi
+  if ! /opt/tailscale serve clear "${service_name}"; then
+    bashio::log.warning "Failed to clear service host ${service_name}"
+  fi
+}
+
+# Read currently advertised services from the tailscale serve config
+if ! current_config=$(/opt/tailscale serve status --json); then
+  bashio::exit.nok "Unable to determine current Tailscale Services configuration"
+fi
+
+# Read configured services from app configuration
+# Note: bashio::config emits one JSON object per line for array options
+readarray -t configured_services < <(bashio::config 'services')
+
+# Importing current Tailscale Services configuration to the new services option on first start
+# This can't be done in stage2_hook, this requires a running tailscaled
+if ! bashio::fs.file_exists "/data/services_import_is_done"; then
+  # This is intentionally done at the beginning, import will be tried only once, even in case of errors
+  touch "/data/services_import_is_done"
+
+  bashio::log.info "Importing Tailscale Services configuration to the new services option..."
+
+  # Filtering for non-importable services
+  if non_importable_services=$(bashio::jq "${current_config}" '
+    .Services // {} | to_entries[] | .key as $name | .value as $service
+    | ($service.Web // {} | to_entries[] | (.key | split(":")[1]) as $port
+      | .value.Handlers | to_entries[] | .key as $path
+      | .value | to_entries[] | select(.key != "Proxy")
+      | { "name": $name, "port": $port, "path": $path, "target-type": .key, "target": .value })
+    , ($service.TCP // {} | to_entries[] | .key as $port
+      | .value | to_entries[] | select(.key | IN("HTTP", "HTTPS", "TCPForward", "TerminateTLS") | not)
+      | { "name": $name, "port": $port,                "target-type": .key, "target": .value })' \
+    -e)
+  then
+    bashio::log.warning \
+      "There are currently configured Tailscale Services that can't be imported to the new services option."
+    bashio::log.warning \
+      "These configurations are NOT kept: the affected service hosts are cleared and re-advertised below" \
+      "from the services option only. The JSON logged here is the only record of them."
+    bashio::log.warning \
+      "To keep them, add matching entries to the services option and restart the app."
+    jq -C <<<"${non_importable_services}"
+  fi
+
+  # Filtering for importable services
+  if importable_services=$(bashio::jq "${current_config}" '
+    .Services // {} | to_entries[] | .key as $name | .value as $service
+    | ($service.Web // {} | to_entries[] | (.key | split(":")[1]) as $port
+      | .value.Handlers | to_entries[] | .key as $path
+      | .value | to_entries[] | select(.key == "Proxy")
+      | { "name": $name, "port": $port, "path": $path, "target": .value })
+    , ($service.TCP // {} | to_entries[] | .key as $port
+      | .value | to_entries[] | select(.key == "TCPForward")
+      | { "name": $name, "port": $port,                "target": "tcp://"+.value })' \
+    -e)
+  then
+    bashio::log.info "There are currently configured Tailscale Services that will be imported to the new services option:"
+    jq -C <<<"${importable_services}"
+
+    # Collect protocols for the service ports
+    eval "declare -A service_protocols=($(bashio::jq "${current_config}" '
+      .Services // {} | to_entries[] | .key as $name
+      | .value.TCP | to_entries[] | .key as $port | (.value | has("TerminateTLS")) as $tls_terminated
+      | .value | to_entries[] | select(.key | IN("HTTP", "HTTPS", "TCPForward"))
+      | { "name": $name, "port": $port,
+        "protocol": if .key == "TCPForward" then if $tls_terminated then "tls-terminated-tcp" else "tcp" end else .key | ascii_downcase end }
+      | @sh "[\(.name+"|"+.port)]=\(.protocol)"'
+    ))"
+
+    # Import services
+    while IFS= read -r service
+    do
+      service_name=$(bashio::jq "${service}" '.name')
+      target=$(bashio::jq "${service}" '.target')
+      port=$(bashio::jq "${service}" '.port')
+      path=$(bashio::jq "${service}" '.path // empty')
+      protocol="${service_protocols["${service_name}|${port}"]}"
+
+      # Replace any localhost or 127.1.2.3 addresses with 127.0.0.1
+      target=${target/:*:/://127.0.0.1:}
+
+      # Remove the default '/' path
+      if bashio::var.equals "${path}" '/'; then
+        path=''
+      fi
+
+      bashio::log.info \
+        "Importing service host configuration for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})"
+
+      # Create service config JSON
+      service_config_args=()
+      service_config_args+=("name")
+      service_config_args+=("${service_name}")
+      service_config_args+=("target")
+      service_config_args+=("${target}")
+      service_config_args+=("protocol")
+      service_config_args+=("${protocol}")
+      service_config_args+=("port")
+      service_config_args+=("^${port}")
+      if bashio::var.has_value "${path}"; then
+        service_config_args+=("path")
+        service_config_args+=("${path}")
+      fi
+      service_config="$(bashio::var.json "${service_config_args[@]}")"
+
+      if [[ " ${configured_services[*]} " =~ " ${service_config} " ]]; then
+        bashio::log.notice \
+          "Service host configuration for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})" \
+          "is already present in the services option, skipping import"
+      else
+        configured_services+=("${service_config}")
+        anything_imported=true
+      fi
+    done <<<"$(bashio::jq "${importable_services}")"
+  fi
+
+  if ! bashio::var.true "${anything_imported}"; then
+    bashio::log.info "Nothing to import to the new services option"
+  else
+    # sed is there to remove the single empty line output on success
+    bashio::try bashio::app.option 'services' "^$(bashio::jq "${configured_services[*]}" '.' -s)" | sed -e "/^$/d"
+    if bashio::try.failed; then
+      bashio::log.warning \
+        "Tailscale Services configuration can't be imported to the new services option"
+      bashio::log.warning \
+        "The currently advertised service hosts are NOT kept, they are cleared below." \
+        "You have to manually configure the services option based on the JSON logged above."
+      # Reread configured services
+      readarray -t configured_services < <(bashio::config 'services')
+    else
+      bashio::log.info "Successfully imported Tailscale Services to the new services option"
+    fi
+  fi
+fi
+
+# Validate all services.protocol values
+if protocol=$( \
+  bashio::jq "${configured_services[*]}" '.protocol | select(.|IN("http","https","tcp","tls-terminated-tcp")|not)' -e \
+  | sort -u)
+then
+  bashio::exit.nok "Invalid value(s) '${protocol//$'\n'/\', \'}' for services.protocol. Must be one of 'http', 'https', 'tcp' or 'tls-terminated-tcp'."
+fi
+
+# Check if Tailscale HTTPS is enabled if needed
+if bashio::jq "${configured_services[*]}" '.protocol | select(.|IN("https","tls-terminated-tcp"))' -e >/dev/null && \
+  ! /opt/tailscale status --self=true --peers=false --json \
+    | jq -rce '.Self.CapMap | has("https")' > /dev/null;
+then
+  bashio::exit.nok \
+    "Tailscale's HTTPS support is disabled." \
+    "Please check your configuration based on the app's documentation under \"Option: services\"."
+fi
+
+# Build a list of unique configured service names
+readarray -t configured_names < <( \
+  bashio::jq "${configured_services[*]}" '.name' \
+  | sort -u)
+
+# Build a list of unique currently configured service names
+readarray -t current_names < <( \
+  bashio::jq "${current_config}" '.Services // {} | keys[]' \
+  | sort -u)
+
+# Remove services that are no longer configured in this app
+# current_names \ configured_names
+for service_name in "${current_names[@]}"; do
+  if ! [[ " ${configured_names[*]} " =~ " ${service_name} " ]]; then
+    bashio::log.info "Removing stale service host configuration for ${service_name}"
+    drain_and_clear_service "${service_name}"
+  fi
+done
+
+# Clean any existing configuration for this service before reconfiguring
+# current_names ⋂ configured_names
+for service_name in "${configured_names[@]}"; do
+  if [[ " ${current_names[*]} " =~ " ${service_name} " ]]; then
+    drain_and_clear_service "${service_name}"
+  fi
+done
+
+if (( 0 < "${#configured_names[@]}" )); then
+  bashio::log.info "Configured service hosts: ${configured_names[*]}"
+fi
+
+# Configure and advertise each service
+for service in "${configured_services[@]}"; do
+  service_name=$(bashio::jq "${service}" '.name')
+  target=$(bashio::jq "${service}" '.target')
+  protocol=$(bashio::jq "${service}" '.protocol')
+  port=$(bashio::jq "${service}" '.port')
+  path=$(bashio::jq "${service}" '.path // empty')
+
+  options=("serve")
+  options+=("--service=${service_name}")
+  options+=("--${protocol}=${port}")
+
+  if bashio::var.has_value "${path}"; then
+    options+=("--set-path=${path}")
+  fi
+
+  options+=("${target}")
+
+  bashio::log.info "Advertising service host for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})"
+  if ! /opt/tailscale "${options[@]}"; then
+    bashio::exit.nok "Failed to advertise service host for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})"
+  fi
+done

@@ -89,8 +89,8 @@ if bashio::var.has_value "${share_service_name}"; then
 fi
 
 # Check DNS configuration
-# This is identical with the check in init-magicdns-ingress-proxy/run
-# This check is to modify the configuration to prevent the check in init-magicdns-ingress-proxy/run from stopping the app startup
+# This is identical with the check in init-magicdns-proxies/run
+# This check is to modify the configuration to prevent the check in init-magicdns-proxies/run from stopping the app startup
 invalid_dns_config="false"
 for dns in $(bashio::dns.locals); do
     if bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV4}" || \

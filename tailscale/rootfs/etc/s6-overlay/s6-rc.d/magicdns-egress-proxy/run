@@ -80,10 +80,10 @@ if bashio::var.equals "${MAGICDNS_MODE}" "RESTRICTED"; then
 
   # Forward everything to hassio DNS, except the black_list
   bashio::log.info "MagicDNS egress proxy: forwarding everything to ${hassio_dns_ipv4}${black_list:+, except:}"
-  options+=(--server=${hassio_dns_ipv4})
+  options+=("--server=${hassio_dns_ipv4}")
   for domain in "${black_list[@]}"; do
     bashio::log.info "  ${domain}"
-    options+=(--server=/${domain}/)
+    options+=("--server=/${domain}/")
   done
 elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
   # This means "Restricted" on egress side, ie. only domains in black-white-list are allowed
@@ -96,7 +96,7 @@ elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
   options+=(--address=/#/)
   for domain in "${white_list[@]}"; do
     bashio::log.info "  ${domain}"
-    options+=(--server=/${domain}/${hassio_dns_ipv4})
+    options+=("--server=/${domain}/${hassio_dns_ipv4}")
   done
 else
   bashio::exit.nok "Invalid MAGICDNS_MODE: '${MAGICDNS_MODE}'"

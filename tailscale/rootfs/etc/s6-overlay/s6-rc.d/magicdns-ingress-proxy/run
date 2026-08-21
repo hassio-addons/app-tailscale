@@ -61,17 +61,17 @@ fi
 
 # Listen addresses
 if bashio::var.has_value "${tailscale_address_ipv4-}"; then
-  options+=(--listen-address=${tailscale_address_ipv4})
+  options+=("--listen-address=${tailscale_address_ipv4}")
 fi
 if bashio::var.has_value "${tailscale_address_ipv6-}"; then
-  options+=(--listen-address=${tailscale_address_ipv6})
+  options+=("--listen-address=${tailscale_address_ipv6}")
 fi
 
 # on a non-lo interface this bind-dynamic option has the effect that dnsmasq connects only to the specified address
 # this is intentionally different from the egress proxy, where on the lo interface bind-interfaces option has the same effect
 # and on the lo interface bind-interfaces option doesn't result in a logged warning
 options+=(--bind-dynamic)
-options+=(--port=${dnsmasq_ingress_port})
+options+=("--port=${dnsmasq_ingress_port}")
 
 if bashio::var.equals "${MAGICDNS_MODE}" "RESTRICTED"; then
   # Only domains in black-white-list are allowed
@@ -84,7 +84,7 @@ if bashio::var.equals "${MAGICDNS_MODE}" "RESTRICTED"; then
   options+=(--address=/#/)
   for domain in "${white_list[@]}"; do
     bashio::log.info "  ${domain}"
-    options+=(--server=/${domain}/${MAGIC_DNS_IPV4})
+    options+=("--server=/${domain}/${MAGIC_DNS_IPV4}")
   done
 elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
   # Everything except domains in black-white-list are allowed
@@ -94,10 +94,10 @@ elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
 
   # Forward everything to MagicDNS, except the black_list
   bashio::log.info "MagicDNS ingress proxy: forwarding everything to ${MAGIC_DNS_IPV4}${black_list:+, except}"
-  options+=(--server=${MAGIC_DNS_IPV4})
+  options+=("--server=${MAGIC_DNS_IPV4}")
   for domain in "${black_list[@]}"; do
     bashio::log.info "  ${domain}"
-    options+=(--server=/${domain}/)
+    options+=("--server=/${domain}/")
   done
 else
   bashio::exit.nok "Invalid MAGICDNS_MODE: '${MAGICDNS_MODE}'"
@@ -112,7 +112,7 @@ if ! bashio::fs.file_exists "${MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIG
   magicdns-ingress-proxy-forwarding setup forwarding "${dnsmasq_ingress_port}"
   magicdns-ingress-proxy-forwarding remove drop
 else
-  printf "${dnsmasq_ingress_port}" > "${DNSMASQ_INGRESS_PORT_LOCATION}"
+  printf '%s' "${dnsmasq_ingress_port}" > "${DNSMASQ_INGRESS_PORT_LOCATION}"
 fi
 
 # We need to delay the starting of the dependent services until iptables are configured

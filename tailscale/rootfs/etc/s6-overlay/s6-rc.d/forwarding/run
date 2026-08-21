@@ -40,7 +40,11 @@ function get_forwardable_address() {
 function get_host_address() {
   local ip_version="${1}"
 
+  # The function name is composed from ip_version, and the address list is
+  # deliberately unquoted so it splits into one word per address
+  # shellcheck disable=SC2086
   if ! bashio::var.equals "$(bashio::network.${ip_version}_method)" "disabled"; then
+    # shellcheck disable=SC2086
     for address in $(bashio::network.${ip_version}_address); do
       if get_forwardable_address "${address}"; then
         break

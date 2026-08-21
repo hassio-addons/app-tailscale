@@ -24,7 +24,7 @@ fi
 # Use configured UDP port
 udp_port=$(bashio::app.port "41641/udp")
 if bashio::var.has_value "${udp_port}"; then
-  options+=(--port=${udp_port})
+  options+=("--port=${udp_port}")
 fi
 
 # Use userspace networking when explicitly enabled
@@ -55,7 +55,7 @@ if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
 else
   # Using fake resolv.conf
   bashio::log.info "Using dnsmasq as upstream DNS server for tailscaled"
-  bashio::net.wait_for 53 $(awk '{ print $2 }' < /etc/resolv.for-tailscaled.conf)
+  bashio::net.wait_for 53 "$(awk '{ print $2 }' < /etc/resolv.for-tailscaled.conf)"
   if bashio::debug ; then
     exec unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")"
   else

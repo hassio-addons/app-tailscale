@@ -19,7 +19,9 @@ function remove_clamping() {
     | sed -nr 's/^.*?-o\s(\S+)\s.*$/\1/p')
   do
     bashio::log.info "Removing the MSS clamping for interface ${interface} (${ip_version})"
-    if ! ${cmd} -t mangle -D FORWARD -o ${interface} ${CLAMPING_IPTABLES_OPTIONS}; then
+    # CLAMPING_IPTABLES_OPTIONS is a list of arguments and must word split
+    # shellcheck disable=SC2086
+    if ! ${cmd} -t mangle -D FORWARD -o "${interface}" ${CLAMPING_IPTABLES_OPTIONS}; then
       bashio::log.warning "Removing clamping is unsuccessful (${ip_version})"
     fi
   done

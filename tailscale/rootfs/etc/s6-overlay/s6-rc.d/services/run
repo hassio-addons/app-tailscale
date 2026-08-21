@@ -55,6 +55,8 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
   bashio::log.info "Importing Tailscale Services configuration to the new services option..."
 
   # Filtering for non-importable services
+  # The jq program is single quoted on purpose so the shell does not expand it
+  # shellcheck disable=SC2016
   if non_importable_services=$(bashio::jq "${current_config}" '
     .Services // {} | to_entries[] | .key as $name | .value as $service
     | ($service.Web // {} | to_entries[] | (.key | split(":")[1]) as $port
@@ -77,6 +79,8 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
   fi
 
   # Filtering for importable services
+  # The jq program is single quoted on purpose so the shell does not expand it
+  # shellcheck disable=SC2016
   if importable_services=$(bashio::jq "${current_config}" '
     .Services // {} | to_entries[] | .key as $name | .value as $service
     | ($service.Web // {} | to_entries[] | (.key | split(":")[1]) as $port
@@ -92,6 +96,8 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
     jq -C <<<"${importable_services}"
 
     # Collect protocols for the service ports
+    # The jq program is single quoted on purpose so the shell does not expand it
+    # shellcheck disable=SC2016
     eval "declare -A service_protocols=($(bashio::jq "${current_config}" '
       .Services // {} | to_entries[] | .key as $name
       | .value.TCP | to_entries[] | .key as $port | (.value | has("TerminateTLS")) as $tls_terminated
@@ -137,6 +143,9 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
       fi
       service_config="$(bashio::var.json "${service_config_args[@]}")"
 
+      # The right hand side is quoted on purpose: the space padded values are
+      # compared literally, which is what makes this set membership check correct
+      # shellcheck disable=SC2076
       if [[ " ${configured_services[*]} " =~ " ${service_config} " ]]; then
         bashio::log.notice \
           "Service host configuration for ${service_name} (${target}, ${protocol}, ${port}${path:+, $path})" \
@@ -198,6 +207,9 @@ readarray -t current_names < <( \
 # Remove services that are no longer configured in this app
 # current_names \ configured_names
 for service_name in "${current_names[@]}"; do
+  # The right hand side is quoted on purpose: the space padded values are
+  # compared literally, which is what makes this set membership check correct
+  # shellcheck disable=SC2076
   if ! [[ " ${configured_names[*]} " =~ " ${service_name} " ]]; then
     bashio::log.info "Removing stale service host configuration for ${service_name}"
     drain_and_clear_service "${service_name}"
@@ -207,6 +219,9 @@ done
 # Clean any existing configuration for this service before reconfiguring
 # current_names ⋂ configured_names
 for service_name in "${configured_names[@]}"; do
+  # The right hand side is quoted on purpose: the space padded values are
+  # compared literally, which is what makes this set membership check correct
+  # shellcheck disable=SC2076
   if [[ " ${current_names[*]} " =~ " ${service_name} " ]]; then
     drain_and_clear_service "${service_name}"
   fi

@@ -22,6 +22,8 @@ function setup_clamping() {
   then
     bashio::log.notice "Clamping is already set (${ip_version})"
   else
+    # CLAMPING_IPTABLES_OPTIONS is a list of arguments and must word split
+    # shellcheck disable=SC2086
     if ! ${cmd} -t mangle -A FORWARD -o ${TAILSCALE_INTERFACE} ${CLAMPING_IPTABLES_OPTIONS}; then
       bashio::log.warning "Setting up clamping is unsuccessful (${ip_version})"
     fi

@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs the MagicDNS egress proxy
@@ -15,8 +14,6 @@ export LOG_FD
 # but we can specify only port 53 DNS in resolv.conf for tailscaled.
 # So in case of IPv6-only hassio, we can't use [::1]:53 for the egress DNS proxy, but we can't use anything else in resolv.conf for tailscaled.
 # For the status of IPv6 support see https://github.com/home-assistant/supervisor/issues/2133
-
-source /usr/lib/trace.sh
 
 readonly DNSMASQ_EGRESS_ADDRESS_IPV4="127.100.100.100"
 readonly DNSMASQ_EGRESS_PORT=53
@@ -63,7 +60,7 @@ for domain in "${white_list[@]}"; do
   options+=(--server=/${domain}/${hassio_dns_ipv4})
 done
 
-if bashio_custom::trace; then
+if bashio::trace; then
   options+=(--log-queries)
   options+=(--log-debug)
 fi

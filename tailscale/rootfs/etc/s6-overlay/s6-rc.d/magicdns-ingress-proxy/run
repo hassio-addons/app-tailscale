@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs the MagicDNS ingress proxy
@@ -11,8 +10,6 @@ export LOG_FD
 #   returns NXDOMAIN for anything that is on the list
 # - when accept_dns is disabled, it treats black_white_list as white_list, and
 #   returns NXDOMAIN for anything that is NOT on the list
-
-source /usr/lib/trace.sh
 
 readonly MAGIC_DNS_IPV4="100.100.100.100"
 
@@ -74,7 +71,7 @@ else
   done
 fi
 
-if bashio_custom::trace; then
+if bashio::trace; then
   options+=(--log-queries)
   options+=(--log-debug)
 fi

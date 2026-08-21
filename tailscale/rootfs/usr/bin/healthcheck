@@ -10,9 +10,7 @@
 
 # Redirect outputs to the log (&1 and &2 are not initialized by Docker)
 exec &> /proc/1/fd/1
-if [[ "${LOG_FD:-}" =~ ^[0-9]+$ ]]; then
-  eval "exec ${LOG_FD}>&1" || true
-fi
+bashio::log.reinitialize_output
 
 readonly HEALTHCHECK_OFFLINE_TIMEOUT=300   # 5 minutes
 readonly HEALTHCHECK_RESTART_TIMEOUT=3600  # 1 hour

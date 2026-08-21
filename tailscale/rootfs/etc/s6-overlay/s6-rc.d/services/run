@@ -66,7 +66,13 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
       | { "name": $name, "port": $port,                "target-type": .key, "target": .value })' \
     -e)
   then
-    bashio::log.warning "There are currently configured Tailscale Services that can't be imported to the new services option:"
+    bashio::log.warning \
+      "There are currently configured Tailscale Services that can't be imported to the new services option."
+    bashio::log.warning \
+      "These configurations are NOT kept: the affected service hosts are cleared and re-advertised below" \
+      "from the services option only. The JSON logged here is the only record of them."
+    bashio::log.warning \
+      "To keep them, add matching entries to the services option and restart the app."
     jq -C <<<"${non_importable_services}"
   fi
 
@@ -148,8 +154,11 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
     # sed is there to remove the single empty line output on success
     bashio::try bashio::app.option 'services' "^$(bashio::jq "${configured_services[*]}" '.' -s)" | sed -e "/^$/d"
     if bashio::try.failed; then
-      bashio::log.warning "Tailscale Services configuration can't be imported to the new services option"
-      bashio::log.warning "You have to manually configure services based on the current configuration logged above in JSON"
+      bashio::log.warning \
+        "Tailscale Services configuration can't be imported to the new services option"
+      bashio::log.warning \
+        "The currently advertised service hosts are NOT kept, they are cleared below." \
+        "You have to manually configure the services option based on the JSON logged above."
       # Reread configured services
       readarray -t configured_services < <(bashio::config 'services')
     else

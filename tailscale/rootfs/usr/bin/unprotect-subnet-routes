@@ -1,6 +1,5 @@
 #!/usr/bin/env bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # In case of non userspace networking,
 # remove local subnets from ip rules

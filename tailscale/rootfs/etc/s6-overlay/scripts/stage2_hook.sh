@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # S6 Overlay stage2 hook to customize services
@@ -11,17 +10,13 @@ declare proxy funnel proxy_and_funnel_port
 declare tags
 declare share_service_name
 
-# This is to execute potentially failing supervisor api functions within conditions,
-# where set -e is not propagated inside the function and bashio relies on set -e for api error handling
-function try {
-    set +e
-    (set -e; "$@")
-    declare -gx TRY_ERROR=$?
-    set -e
-}
+readonly MAGIC_DNS_IPV4="100.100.100.100"
+readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
+declare dns
+declare invalid_dns_config
 
 # Load app options, even deprecated one to upgrade
-options=$(bashio::addon.options)
+options=$(bashio::app.options)
 
 # Upgrade configuration from 'proxy', 'funnel' and 'proxy_and_funnel_port' to 'share_homeassistant' and 'share_on_port'
 # This step can be removed in a later version
@@ -31,17 +26,17 @@ proxy_and_funnel_port=$(bashio::jq "${options}" '.proxy_and_funnel_port | select
 # Upgrade to share_homeassistant
 if bashio::var.true "${proxy}"; then
     if bashio::var.true "${funnel}"; then
-        bashio::addon.option 'share_homeassistant' 'funnel'
+        bashio::app.option 'share_homeassistant' 'funnel'
         bashio::log.info "Successfully migrated proxy and funnel options to share_homeassistant: funnel"
     else
-        bashio::addon.option 'share_homeassistant' 'serve'
+        bashio::app.option 'share_homeassistant' 'serve'
         bashio::log.info "Successfully migrated proxy and funnel options to share_homeassistant: serve"
     fi
 fi
 # Upgrade to share_on_port
 if bashio::var.has_value "${proxy_and_funnel_port}"; then
-    try bashio::addon.option 'share_on_port' "^${proxy_and_funnel_port}"
-    if ((TRY_ERROR)); then
+    bashio::try bashio::app.option 'share_on_port' "^${proxy_and_funnel_port}"
+    if bashio::try.failed; then
         bashio::log.warning "The proxy_and_funnel_port option value '${proxy_and_funnel_port}' is invalid, proxy_and_funnel_port option is dropped, using default port."
     else
         bashio::log.info "Successfully migrated proxy_and_funnel_port option to share_on_port: ${proxy_and_funnel_port}"
@@ -50,15 +45,15 @@ fi
 # Remove previous options
 if bashio::var.has_value "${proxy}"; then
     bashio::log.info 'Removing deprecated proxy option'
-    bashio::addon.option 'proxy'
+    bashio::app.option 'proxy'
 fi
 if bashio::var.has_value "${funnel}"; then
     bashio::log.info 'Removing deprecated funnel option'
-    bashio::addon.option 'funnel'
+    bashio::app.option 'funnel'
 fi
 if bashio::var.has_value "${proxy_and_funnel_port}"; then
     bashio::log.info 'Removing deprecated proxy_and_funnel_port option'
-    bashio::addon.option 'proxy_and_funnel_port'
+    bashio::app.option 'proxy_and_funnel_port'
 fi
 
 # Rename changed options
@@ -78,42 +73,58 @@ fi
 share_service_name=$(bashio::jq "${options}" '.share_service_name | select(.!=null)')
 if bashio::var.has_value "${share_service_name}"; then
     bashio::log.info 'Removing deprecated share_service_name option'
-    bashio::addon.option 'share_service_name'
+    bashio::app.option 'share_service_name'
+fi
+
+# Check DNS configuration
+# This is identical with the check in init-magicdns-ingress-proxy/run
+# This check is to modify the configuration to prevent the check in init-magicdns-ingress-proxy/run from stopping the app startup
+invalid_dns_config="false"
+for dns in $(bashio::dns.locals); do
+    if bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV4}" || \
+        bashio::var.equals "${dns}" "dns://${MAGIC_DNS_IPV6}"
+    then
+        bashio::log.warning \
+            "Do not configure MagicDNS's IP address (${dns:6}) as DNS server under Settings -> System -> Network"
+        invalid_dns_config="true"
+    fi
+done
+if bashio::var.true "${invalid_dns_config}"; then
+    bashio::log.warning \
+        "Due to invalid networking DNS configuration, userspace_networking option will be enabled to disable MagicDNS"
+    bashio::log.warning \
+        "Please check your configuration based on the app's documentation under the \"DNS\" section"
+    bashio::log.warning \
+        "After the issue is fixed you can disable userspace_networking option again and restart the app"
+    bashio::app.option 'userspace_networking' 'true'
 fi
 
 # MagicDNS related service dependencies:
 #
-#                                    +-------- magicdns-ingress-proxy
-#                                    |          |                 |
-#                                    |          |                 |
-#                                    ˅    !!    ˅                 |
-#   init-magicdns-proxies-upstream-list -----> post-tailscaled    |
-#                                    ˄          |                 |
-#                                    |          |                 |
-#                                    |    !!    ˅                 |
-#                 magicdns-egress-proxy <----- tailscaled         |
-#                                               |                 |
-#                                               |                 |
-#                                               ˅                 ˅
-#                                              init-magicdns-ingress-proxy
+#   user
+#   |  ˅
+#   |  magicdns-proxies-reconfigurator
+#   ˅  ˅
+#   magicdns-ingress-proxy
+#   |  ˅
+#   |  magicdns-proxies-configurator
+#   |  ˅
+#   |  post-tailscaled
+#   |  ˅
+#   |  tailscaled
+#   |  ˅
+#   |  magicdns-egress-proxy
+#   ˅  ˅
+#   init-magicdns-proxies
 #
-# Disable MagicDNS egress proxy service when userspace-networking is enabled or accepting dns is disabled
-if bashio::config.true "userspace_networking" || \
-    bashio::config.false "accept_dns";
-then
-    # Either this or init-magicdns-proxies-upstream-list/dependencies.d/post-tailscaled below has to be removed
-    # When accepting dns is disabled init-magicdns-proxies-upstream-list depends on post-tailscaled
-    rm /etc/s6-overlay/s6-rc.d/tailscaled/dependencies.d/magicdns-egress-proxy
-else
-    # Either this or tailscaled/dependencies.d/magicdns-egress-proxy above has to be removed
-    # When accepting dns is enabled init-magicdns-proxies-upstream-list doesn't depend on post-tailscaled
-    rm /etc/s6-overlay/s6-rc.d/init-magicdns-proxies-upstream-list/dependencies.d/post-tailscaled
-fi
-# Disable MagicDNS ingress proxy service when userspace-networking is enabled
 if bashio::config.true "userspace_networking"; then
-    rm /etc/s6-overlay/s6-rc.d/forwarding/dependencies.d/magicdns-ingress-proxy
+    # Disable MagicDNS egress and ingress proxy related services when userspace_networking is enabled
+    rm /etc/s6-overlay/s6-rc.d/user/contents.d/magicdns-proxies-reconfigurator
     rm /etc/s6-overlay/s6-rc.d/user/contents.d/magicdns-ingress-proxy
-    rm /etc/s6-overlay/s6-rc.d/tailscaled/dependencies.d/init-magicdns-ingress-proxy
+    rm /etc/s6-overlay/s6-rc.d/tailscaled/dependencies.d/magicdns-egress-proxy
+elif bashio::config.false "accept_dns"; then
+    # Disable MagicDNS egress and ingress proxy reconfigurator when userspace_networking is disabled but accept_dns is also disabled
+    rm /etc/s6-overlay/s6-rc.d/user/contents.d/magicdns-proxies-reconfigurator
 fi
 
 # Disable protect-subnets service when userspace-networking is enabled or accepting routes is disabled

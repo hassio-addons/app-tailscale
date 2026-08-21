@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Enables Tailscale Serve or Funnel feature to share Home Assistant
@@ -12,7 +11,10 @@ readonly WAIT_COUNT=18  # 18*5s = 90s = 1.5m
 declare wait_counter=0
 declare curl_result
 
-declare -a options
+declare curl_protocol
+declare tailscale_protocol
+declare -a curl_options
+declare -a tailscale_options
 
 # Validate share_homeassistant value
 if ! bashio::config.equals 'share_homeassistant' 'serve' && \
@@ -28,13 +30,41 @@ then
   bashio::exit.nok "Tailscale's HTTPS support is disabled"
 fi
 
-# Checking if SSL is used
-if bashio::var.true "$(bashio::core.ssl)"; then
-  bashio::exit.nok "Tailscale's HTTPS support is enabled, but Home Assistant is not accessible through plain HTTP connection"
+# Check if Funnel is available
+if bashio::config.equals 'share_homeassistant' 'funnel'; then
+  if ! /opt/tailscale status --self=true --peers=false --json \
+    | jq -rce '.Self.CapMap | has("funnel")' > /dev/null;
+  then
+    bashio::exit.nok "Tailscale's Funnel support is disabled"
+  fi
 fi
 
+curl_options+=(-s)
+curl_options+=(-o/dev/null)
+curl_options+=(-w"%{http_code}")
+
+tailscale_options+=("$(bashio::config 'share_homeassistant')")
+tailscale_options+=(--bg=false)
+tailscale_options+=(--https="$(bashio::config 'share_on_port')")
+tailscale_options+=(--set-path=/)
+
+# Checking if SSL is used
+if bashio::var.true "$(bashio::core.ssl)"; then
+  bashio::log.notice \
+    "Home Assistant is using SSL, Tailscale will connect to Home Assistant locally through HTTPS," \
+    "that unnecessarily uses resources and slows down the communication."
+  curl_protocol="https"
+  curl_options+=(-k)
+  tailscale_protocol="https+insecure"
+else
+  curl_protocol="http"
+  tailscale_protocol="http"
+fi
+curl_options+=("${curl_protocol}://127.0.0.1:$(bashio::core.port)")
+tailscale_options+=("${tailscale_protocol}://127.0.0.1:$(bashio::core.port)")
+
 # Wait a bit for HA to be available during startup
-while (( 200 != (curl_result=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$(bashio::core.port)")) )); do
+while (( 200 != (curl_result=$(curl "${curl_options[@]}")) )); do
   if (( wait_counter++ == WAIT_COUNT )); then
     break
   fi
@@ -46,37 +76,23 @@ if (( wait_counter != 0 && curl_result == 200)); then
 fi
 
 if (( 200 != curl_result )); then
-  # Warn that we can't test Home Assistant's HTTP reverse proxy configuration
+  # Warn that we can't test Home Assistant's HTTP/HTTPS reverse proxy configuration
   # We emit only a warning to let the app start, maybe this is the only connection to access the device, better to start than not
   # Though starting tailscale serve without HA won't fail, but will fill the logs with messages forever in each ~10s
   bashio::log.warning "Home Assistant is not accessible currently, unable to test the connection to Home Assistant as reverse proxy"
 else
-  # Test Home Assistant's HTTP reverse proxy configuration
-  if (( 200 != $(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$(bashio::core.port)" -H "X-Forwarded-For: 127.0.0.1") )); then
+  # Test Home Assistant's HTTP/HTTPS reverse proxy configuration
+  curl_options+=(-H "X-Forwarded-For: 127.0.0.1")
+  if (( 200 != $(curl "${curl_options[@]}") )); then
     bashio::exit.nok \
       "Unable to connect to Home Assistant as reverse proxy." \
       "Please check your configuration based on the app's documentation under \"Option: share_homeassistant\"."
   fi
 fi
 
-# Check if Funnel is available
-if bashio::config.equals 'share_homeassistant' 'funnel'; then
-  if ! /opt/tailscale status --self=true --peers=false --json \
-    | jq -rce '.Self.CapMap | has("funnel")' > /dev/null;
-  then
-    bashio::exit.nok "Tailscale's Funnel support is disabled"
-  fi
-fi
-
-options+=("$(bashio::config 'share_homeassistant')")
-options+=(--bg=false)
-options+=(--https="$(bashio::config 'share_on_port')")
-options+=(--set-path=/)
-options+=(http://127.0.0.1:"$(bashio::core.port)")
-
 # This service can wait for HA for minutes, let notify S6 when we are really starting
 echo "" >&3
 exec 3>&-
 
 # Set up serve or funnel
-exec /opt/tailscale "${options[@]}"
+exec /opt/tailscale "${tailscale_options[@]}"

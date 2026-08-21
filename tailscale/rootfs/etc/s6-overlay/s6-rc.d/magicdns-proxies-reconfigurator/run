@@ -1,0 +1,77 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Periodically runs the dnsmasq proxies black/white list initialization
+# ==============================================================================
+
+# used by the healthcheck script
+# MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE is in contenv at /var/run/s6/container_environment
+
+# used by the magicdns-ingress-proxy service
+readonly MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION="/run/magicdns_ingress_proxy_suppress_forwarding_configuration"
+# updated by the magicdns-ingress-proxy service
+readonly DNSMASQ_INGRESS_PORT_LOCATION="/run/dnsmasq_ingress_port"
+
+declare magicdns_proxies_configuration
+declare healthy=true
+
+function restart_proxies() {
+  bashio::log.info "MagicDNS proxy configuration has changed"
+
+  bashio::log.info "Disabling incoming DNS queries during reconfiguration..."
+  magicdns-ingress-proxy-forwarding setup drop
+  magicdns-ingress-proxy-forwarding remove forwarding
+
+  bashio::log.info "Restarting MagicDNS egress proxy..."
+  s6-svc -ruwR /run/service/magicdns-egress-proxy
+
+  bashio::log.info "Restarting MagicDNS ingress proxy..."
+  touch "${MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION}"
+  rm -r -f "${DNSMASQ_INGRESS_PORT_LOCATION}"
+  s6-svc -ruwR /run/service/magicdns-ingress-proxy
+  rm -r -f "${MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION}"
+  if ! bashio::fs.file_non_empty "${DNSMASQ_INGRESS_PORT_LOCATION}"; then
+    bashio::log.fatal "MagicDNS ingress proxy port is unknown"
+    return 1
+  fi
+
+  bashio::log.info "Enabling incoming DNS queries after reconfiguration..."
+  magicdns-ingress-proxy-forwarding setup forwarding "$(<"${DNSMASQ_INGRESS_PORT_LOCATION}")"
+  rm -r -f "${DNSMASQ_INGRESS_PORT_LOCATION}"
+  magicdns-ingress-proxy-forwarding remove drop
+}
+
+bashio::log.info "Subscribing to IPN message bus..."
+# After version v1.102 TS doesn't emit the NetMap in IPN messages, we should detect the Notify.SelfChange signal, then query the DNS status.
+# Details: https://github.com/tailscale/tailscale/commit/aa5da2e5f22a785f345e0a05dd8a318a8a50976e
+# The --initial=true flag is intentionally not used, there is no equivalent for the SelfChange signal, we echo a dummy SelfChange signal instead.
+# The jq emits only empty lines, there is no usable DNS info in the messages.
+{ echo '{"SelfChange":true}'; /opt/tailscale debug watch-ipn; } \
+| stdbuf -i0 -oL -eL jq -rcM 'select(.SelfChange != null) | ""' \
+| while IFS= read -r
+do
+  # On the first run and on subsequent SelfChange events we compare the current
+  # DNS state with the previous call of configure-magicdns-proxies script.
+  # The configure-magicdns-proxies script is first called from the
+  # magicdns-proxies-configurator service, then from this service.
+  # This way we don't miss any change even between the startup of these 2 services
+
+  # If we can't check the DNS configuration, the healthcheck script will treat it as an offline situation
+  if ! magicdns_proxies_configuration=$(configure-magicdns-proxies test); then
+    printf "UNHEALTHY" > /var/run/s6/container_environment/MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE
+    healthy=false
+  else
+    if bashio::var.false "${healthy}"; then
+      printf "HEALTHY" > /var/run/s6/container_environment/MAGICDNS_PROXIES_RECONFIGURATOR_HEALTH_STATE
+      healthy=true
+    fi
+    # Restart dnsmasq proxies if required
+    if ! bashio::var.equals "${magicdns_proxies_configuration}" 'unchanged'; then
+      bashio::try restart_proxies
+      if bashio::try.failed; then
+        bashio::exit.nok "Failed to reconfigure and restart MagicDNS proxies. Halting app to prevent network loss."
+      fi
+    fi
+  fi
+done

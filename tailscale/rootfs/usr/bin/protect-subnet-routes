@@ -1,6 +1,5 @@
 #!/usr/bin/env bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # In case of non userspace networking,
 # add local subnets to ip rules with higher priority than Tailscale's routing
@@ -26,8 +25,8 @@ if [[ "${1-}" != "tested" ]]; then
   # It is possible to get "ERROR: Got unexpected response from the API: System is not ready with state: setup"
   # Test both networking and config Supervisor API availability, these APIs are called in subnet-routes script
   # And wait a little on inaccessibility
-  while ! bashio::api.supervisor GET "/network/interface/default/info" false &> /dev/null || \
-    ! bashio::api.supervisor GET "/addons/self/options/config" false &> /dev/null
+  while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null" || \
+    ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
   do
     if (( wait_counter++ == WAIT_COUNT )); then
       bashio::exit.nok "Supervisor is unreachable"

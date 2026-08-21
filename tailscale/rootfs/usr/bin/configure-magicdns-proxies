@@ -1,0 +1,114 @@
+#!/usr/bin/env bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Configures the dnsmasq proxies black/white list
+# ==============================================================================
+
+readonly DEFAULT_LOGIN_SERVER_1="controlplane.tailscale.com"
+readonly DEFAULT_LOGIN_SERVER_2="login.tailscale.com"
+readonly LOG_SERVER_1="log.tailscale.com"
+readonly LOG_SERVER_2="log.tailscale.io"
+readonly LETSENCRYPT_API="acme-v02.api.letsencrypt.org"
+
+# MAGICDNS_MODE is in contenv at /var/run/s6/container_environment
+# - "RESTRICTED"   only domains in black-white-list are allowed on ingress side, everything else on egress side
+# - "UNRESTRICTED" everything except domains in black-white-list are allowed on ingress side, only domains in black-white-list on egress side
+readonly DNSMASQ_BLACK_WHITE_LIST_LOCATION="/run/dnsmasq_black_white_list"
+
+readonly PREVIOUS_MAGICDNS_STATUS_LOCATION="/run/previous_magicdns_status"
+
+declare login_server="${DEFAULT_LOGIN_SERVER_1}"
+declare -a black_white_list=()
+declare dns_status_json
+declare previous_dns_status_json
+declare tailnet
+declare override_dns_servers
+declare domain
+declare add_tailnet
+
+if ! [[ "${1-}" =~ ^(|test)$ ]]; then
+  echo "Usage: $(basename "$0") [test]" 1>&2
+  exit 1
+fi
+
+if ! dns_status_json=$( \
+    /opt/tailscale dns status --json \
+    | jq -rcM '{"MagicDNSSuffix": .CurrentTailnet.MagicDNSSuffix, "Resolvers": has("Resolvers"), "SplitDNSRoutes": .SplitDNSRoutes | keys}') || \
+  ! bashio::var.has_value "${dns_status_json}"
+then
+  bashio::exit.nok "Determining MagicDNS status has failed"
+fi
+
+if [[ "${1-}" == "test" ]]; then
+  # It doesn't test accept_dns change, but that can't change while the app is running, that requires a restart
+  previous_dns_status_json=$(<"${PREVIOUS_MAGICDNS_STATUS_LOCATION}")
+  if bashio::var.equals "${dns_status_json}" "${previous_dns_status_json}"; then
+    printf 'unchanged'
+    bashio::exit.ok
+  fi
+fi
+
+if bashio::config.false "accept_dns"; then
+  # local accept_dns is disabled, MagicDNS can resolve only tailnet related queries
+  # this prevents logging SERVFAIL by 100.100.100.100 for non-tailnet queries
+  MAGICDNS_MODE="RESTRICTED"
+
+  tailnet=$(bashio::jq "${dns_status_json}" '.MagicDNSSuffix')
+  black_white_list+=("${tailnet}")
+else
+  override_dns_servers=$(bashio::jq "${dns_status_json}" '.Resolvers')
+  if bashio::var.false "${override_dns_servers}"; then
+    # local accept_dns is enabled, but global override_dns_servers is disabled, MagicDNS can resolve only splitDNS domains related queries
+    # splitDNS domains normally contain the tailnet also, though we add it if not
+    MAGICDNS_MODE="RESTRICTED"
+
+    # Add the split dns domains as white list
+    tailnet=$(bashio::jq "${dns_status_json}" '.MagicDNSSuffix')
+    add_tailnet=true
+    for domain in $( \
+      bashio::jq "${dns_status_json}" '.SplitDNSRoutes[]' \
+      | sed -e 's/\.$//')
+    do
+      black_white_list+=("${domain}")
+      if [[ "${tailnet}" == *${domain} ]]; then
+        add_tailnet=false
+      fi
+    done
+    # Add the tailnet if missing
+    if bashio::var.true "${add_tailnet}"; then
+      black_white_list+=("${tailnet}")
+    fi
+  else
+    # local accept_dns and global override_dns_servers are enabled, MagicDNS can resolve nearly anything
+    # except a short list that always resolved by hassio DNS to make sure tailscaled functions properly
+    MAGICDNS_MODE="UNRESTRICTED"
+
+    # We have to be able to determine login_server from this address
+    if ! login_server=$(awk -F[/:] '{print $4}' <<<"$(bashio::config "login_server")") || \
+      ! bashio::var.has_value "${login_server}"
+    then
+      bashio::exit.nok "Determining host name from '$(bashio::config "login_server")' has failed"
+    fi
+    black_white_list+=("${login_server}")
+    if bashio::var.equals "${login_server}" "${DEFAULT_LOGIN_SERVER_1}"; then
+      black_white_list+=("${DEFAULT_LOGIN_SERVER_2}")
+    fi
+    if bashio::var.equals "${login_server}" "${DEFAULT_LOGIN_SERVER_2}"; then
+      black_white_list+=("${DEFAULT_LOGIN_SERVER_1}")
+    fi
+
+    # When log upload is enabled, resolve log server also
+    if bashio::config.true "log_upload"; then
+      black_white_list+=("${LOG_SERVER_1}")
+      black_white_list+=("${LOG_SERVER_2}")
+    fi
+
+    # Always resolve letsencrypt's api also (independent of share_homeassistant)
+    black_white_list+=("${LETSENCRYPT_API}")
+  fi
+fi
+
+printf "%s" "${MAGICDNS_MODE}" > /var/run/s6/container_environment/MAGICDNS_MODE
+printf "%s" "${black_white_list[@]/%/$'\n'}" > "${DNSMASQ_BLACK_WHITE_LIST_LOCATION}"
+
+printf "%s" "${dns_status_json}" > "${PREVIOUS_MAGICDNS_STATUS_LOCATION}"

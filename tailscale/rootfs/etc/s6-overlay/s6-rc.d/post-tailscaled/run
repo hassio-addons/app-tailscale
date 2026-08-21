@@ -1,6 +1,5 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
-export LOG_FD
 # ==============================================================================
 # Home Assistant Community App: Tailscale
 # Runs after the machine has been logged in into the Tailscale network
@@ -11,7 +10,7 @@ declare -a routes=()
 declare route
 declare -a colliding_routes=()
 declare login_server
-declare tags
+declare advertise_tags
 declare keyexpiry
 
 # Default options
@@ -81,8 +80,8 @@ else
 fi
 
 # Get configured tags
-tags=$(bashio::config "tags | join(\",\")")
-options+=(--advertise-tags="${tags}")
+advertise_tags=$(bashio::config "advertise_tags | join(\",\")")
+options+=(--advertise-tags="${advertise_tags}")
 
 # Advertise subnet routes
 readarray -t routes < <(subnet-routes advertised)

@@ -53,26 +53,27 @@ https://console.tailscale.com/
 **Note:** _This is just an example, not even the default, don't copy and paste
 it! Create your own!_
 
+<!-- prettier-ignore -->
 ```yaml
 accept_dns: true
 accept_routes: false
 advertise_connector: false
 advertise_exit_node: false
-advertise_routes:
+advertise_routes:                       # the default is [] (an empty list), here are some examples:
   - local_subnets
   - 192.168.1.0/24
   - fd12:3456:abcd::/64
-advertise_tags:
+advertise_tags:                         # the default is [] (an empty list), here are some examples:
   - tag:example
   - tag:homeassistant
 always_use_derp: false
-exit_node: 100.101.102.103
+exit_node: 100.101.102.103              # this is optional, i.e. it is missing by default
 log_level: info
 log_upload: false
 login_server: "https://controlplane.tailscale.com"
 share_homeassistant: disabled
 share_on_port: 443
-services:
+services:                               # the default is [] (an empty list), here are some examples:
   - name: svc:audiobookshelf
     target: http://127.0.0.1:13378
     protocol: http

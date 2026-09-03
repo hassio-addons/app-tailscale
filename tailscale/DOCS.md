@@ -59,7 +59,6 @@ accept_routes: false
 advertise_connector: false
 advertise_exit_node: false
 advertise_routes:
-  - local_subnets
   - 192.168.1.0/24
   - fd12:3456:abcd::/64
 advertise_tags:
@@ -166,9 +165,6 @@ your device is connected to) to other clients on your tailnet.
 
 By adding to the list the IP addresses and masks of the subnet routes, you can
 use it to make your devices on these subnets accessible within your tailnet.
-
-By adding `local_subnets` to the list, the app will advertise routes to your
-subnets on all supported interfaces.
 
 More information: [Subnet routers][tailscale_info_subnets]
 

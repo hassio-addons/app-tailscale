@@ -5,10 +5,8 @@
 # Runs tailscale
 # ==============================================================================
 
-readonly TAILSCALED_LOGLEVEL_NOTICE="Tailscale logs will be suppressed after 200 lines, set app's configuration option 'log_level' to 'debug' to see further logs"
-readonly TAILSCALED_LOGLEVEL_MESSAGE="[further tailscaled logs suppressed, set app's configuration option 'log_level' to 'debug' to see further tailscaled logs]"
-
 declare -a options
+declare awk_program
 declare udp_port
 
 bashio::log.info 'Starting Tailscale...'
@@ -38,31 +36,37 @@ if bashio::config.true "always_use_derp"; then
   bashio::log.notice "You have enabled always_use_derp, all traffic will be routed via DERP servers"
 fi
 
+# Configure awk for log supression
+if bashio::config.true 'log_suppression'; then
+  bashio::log.notice \
+    "Tailscale's log messages will be suppressed after 200 lines, set the app's configuration option \"log_suppression\" to \"false\" to see further logs"
+  awk_program='
+    NR<=200 {print}
+    NR==201 {system("bash -c \"
+      source /usr/lib/bashio/bashio.sh;
+      bashio::log.notice \\\"Further Tailscale log messages are suppressed, set the app'"'"'s configuration option \\\\\\\"log_suppression\\\\\\\" to \\\\\\\"false\\\\\\\" to see further logs\\\" \" ")}'
+  awk_program="${awk_program//$'\n'/}"
+fi
+
 # Run Tailscale
 # If exists, resolv.dnsmasq.conf pointing to the dummy dnsmasq will be mounted in place of the real resolv.conf only for tailscaled
 # This will prevent the DNS at 100.100.100.100 to call back to hassio_dns causing a loop
 if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
   # Running the regular way, no resolv.conf replacement
-  if bashio::debug ; then
+  if bashio::config.false 'log_suppression' ; then
     exec /opt/tailscaled "${options[@]}"
   else
-    bashio::log.notice "${TAILSCALED_LOGLEVEL_NOTICE}"
-    /opt/tailscaled "${options[@]}" 2>&1 \
-      | stdbuf -i0 -oL -eL \
-        sed -n -e '1,200p' \
-          -e "201c${TAILSCALED_LOGLEVEL_MESSAGE}"
+    exec /opt/tailscaled "${options[@]}" \
+      2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
   fi
 else
   # Using fake resolv.conf
   bashio::log.info "Using dnsmasq as upstream DNS server for tailscaled"
   bashio::net.wait_for 53 "$(awk '{ print $2 }' < /etc/resolv.for-tailscaled.conf)"
-  if bashio::debug ; then
+  if bashio::config.false 'log_suppression' ; then
     exec unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")"
   else
-    bashio::log.notice "${TAILSCALED_LOGLEVEL_NOTICE}"
-    unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}") 2>&1" \
-      | stdbuf -i0 -oL -eL \
-        sed -n -e '1,200p' \
-          -e "201c${TAILSCALED_LOGLEVEL_MESSAGE}"
+    exec unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")" \
+      2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
   fi
 fi

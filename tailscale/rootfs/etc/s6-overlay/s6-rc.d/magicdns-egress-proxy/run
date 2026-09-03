@@ -102,11 +102,6 @@ else
   bashio::exit.nok "Invalid MAGICDNS_MODE: '${MAGICDNS_MODE}'"
 fi
 
-if bashio::trace; then
-  options+=(--log-queries)
-  options+=(--log-debug)
-fi
-
 magicdns-egress-proxy-forwarding setup forwarding "${dnsmasq_egress_port}"
 
 if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then

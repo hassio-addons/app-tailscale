@@ -53,11 +53,14 @@ configuration:
       By setting a device on your network as an exit node, you can use it to
       route all your public internet traffic as needed, like a consumer VPN.
       This option is unused by default.
-  log_level:
-    name: Log level
+  log_suppression:
+    name: Log suppression
     description: >-
-      Controls the level of log details the app provides.
-      This only applies to the app itself, not Tailscale.
+      This option allows you to suppress Tailscale's log messages in the app's log
+      after 200 lines.
+      Turn it off only in case you are troubleshooting, because Tailscale is quite
+      chatty.
+      This option is enabled by default.
   log_upload:
     name: Log upload
     description: >-

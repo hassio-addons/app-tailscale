@@ -67,7 +67,7 @@ advertise_tags:
   - tag:homeassistant
 always_use_derp: false
 exit_node: 100.101.102.103
-log_level: info
+log_suppression: true
 log_upload: false
 login_server: "https://controlplane.tailscale.com"
 share_homeassistant: disabled
@@ -224,29 +224,15 @@ section of this documentation.
 **Note:** The `exit-node-allow-lan-access` option is always enabled when an exit
 node is specified. This is required by the Home Assistant environment.
 
-### Option: `log_level`
+### Option: `log_suppression`
 
-Optionally enable all tailscaled debug messages in the app's log. Turn it on only
-in case you are troubleshooting, because Tailscale's daemon is quite chatty. If
-`log_level` is set to `info` or less severe level, tailscaled logs will be
-suppressed after 200 lines.
+This option allows you to suppress Tailscale's log messages in the app's log
+after 200 lines.
 
-The `log_level` option controls the level of log output by the app and can
-be changed to be more or less verbose, which might be useful when you are
-dealing with an unknown issue. Possible values are:
+Turn it off only in case you are troubleshooting, because Tailscale is quite
+chatty.
 
-- `trace`: Show every detail, like all called internal functions.
-- `debug`: Shows detailed debug information.
-- `info`: Normal (usually) interesting events.
-- `notice`: Normal but significant events.
-- `warning`: Exceptional occurrences that are not errors.
-- `error`: Runtime errors that do not require immediate action.
-- `fatal`: Something went terribly wrong. App becomes unusable.
-
-Please note that each level automatically includes log messages from a
-more severe level, e.g., `debug` also shows `info` messages. By default,
-the `log_level` is set to `info`, which is the recommended setting unless
-you are troubleshooting.
+This option is enabled by default.
 
 ### Option: `log_upload`
 

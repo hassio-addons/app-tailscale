@@ -103,11 +103,6 @@ else
   bashio::exit.nok "Invalid MAGICDNS_MODE: '${MAGICDNS_MODE}'"
 fi
 
-if bashio::trace; then
-  options+=(--log-queries)
-  options+=(--log-debug)
-fi
-
 if ! bashio::fs.file_exists "${MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION}"; then
   magicdns-ingress-proxy-forwarding setup forwarding "${dnsmasq_ingress_port}"
   magicdns-ingress-proxy-forwarding remove drop

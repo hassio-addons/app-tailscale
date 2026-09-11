@@ -26,19 +26,7 @@ if bashio::cache.exists "subnet-routes-$1"; then
 else
   if [[ "$1" == "advertised" ]]; then
     # Use configured values
-    for address in $(bashio::config "advertise_routes"); do
-      if [[ "${address}" =~ ^local_subnets$ ]]; then
-        # Handle special value, collect local subnets
-        readarray -t routes < <(subnet-routes local)
-        if (( 0 == ${#routes[@]} )); then
-          bashio::log.warning \
-            "There are no local subnets to advertise!" \
-            "Restart of the app is required after the issue is fixed!"
-        fi
-      else
-        addresses+=("${address}")
-      fi
-    done
+    readarray -t addresses < <(bashio::config "advertise_routes")
   else
     # Find interfaces and matching addresses from which we can extract routes
     for interface in $(bashio::network.interfaces); do

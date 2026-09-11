@@ -32,8 +32,6 @@ configuration:
     description: >-
       This option allows you to advertise routes to subnets (accessible on the network
       your device is connected to) to other clients on your tailnet.
-      By adding `local_subnets` to the list, the app will advertise routes to your
-      subnets on all supported interfaces.
   advertise_tags:
     name: Advertise tags
     description: >-

@@ -4,4 +4,7 @@
 # Wait for the local network (default HA interface) to be ready
 # ==============================================================================
 
+# Some services need a working local network to function properly.
+# They can mark this service as dependency, and wait for the successful startup.
+
 wait-for-local-network || true

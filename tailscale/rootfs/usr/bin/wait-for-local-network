@@ -9,9 +9,6 @@ readonly WAIT_COUNT=60  # 60*5s = 300s = 5m
 
 declare wait_counter=0
 
-# Some services need a working local network to function properly.
-# They can mark this service as dependency, and wait for the successful startup.
-
 # Until HA has no default interface, we wait a little
 while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null"; do
   if (( wait_counter++ == WAIT_COUNT )); then

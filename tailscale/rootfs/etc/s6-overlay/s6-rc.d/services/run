@@ -160,8 +160,7 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
   if ! bashio::var.true "${anything_imported}"; then
     bashio::log.info "Nothing to import to the new services option"
   else
-    # sed is there to remove the single empty line output on success
-    bashio::try bashio::app.option 'services' "^$(bashio::jq "${configured_services[*]}" '.' -s)" | sed -e "/^$/d"
+    bashio::try bashio::app.option 'services' "^$(bashio::jq "${configured_services[*]}" '.' -s)"
     if bashio::try.failed; then
       bashio::log.warning \
         "Tailscale Services configuration can't be imported to the new services option"

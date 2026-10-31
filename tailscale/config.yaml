@@ -13,6 +13,7 @@ arch:
   - aarch64
   - amd64
 init: false
+timeout: 120
 hassio_api: true
 host_network: true
 host_dbus: true

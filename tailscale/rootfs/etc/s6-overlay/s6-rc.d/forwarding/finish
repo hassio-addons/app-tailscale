@@ -32,14 +32,10 @@ function remove_forwarding() {
 }
 
 # Tailscale's IP addresses
-if ! from_address_ipv4=$(/opt/tailscale ip -4); then
-  bashio::log.warning "Failed to retrieve Tailscale's IPv4 address"
-fi
-if ! from_address_ipv6=$(/opt/tailscale ip -6); then
-  bashio::log.warning "Failed to retrieve Tailscale's IPv6 address"
-fi
+from_address_ipv4=$(/opt/tailscale ip -4 2>/dev/null || true)
+from_address_ipv6=$(/opt/tailscale ip -6 2>/dev/null || true)
 
-remove_forwarding "iptables" "PREROUTING" "IPv4" "32" "${from_address_ipv4-}" "incoming"
-remove_forwarding "ip6tables" "PREROUTING" "IPv6" "128" "${from_address_ipv6-}" "incoming"
-remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${from_address_ipv4-}" "local"
-remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${from_address_ipv6-}" "local"
+remove_forwarding "iptables" "PREROUTING" "IPv4" "32" "${from_address_ipv4}" "incoming"
+remove_forwarding "ip6tables" "PREROUTING" "IPv6" "128" "${from_address_ipv6}" "incoming"
+remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${from_address_ipv4}" "local"
+remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${from_address_ipv6}" "local"

@@ -14,7 +14,7 @@ bashio::log.info \
   "Service ${service} exited with code ${exit_code_service}" \
   "(by signal ${exit_code_signal})"
 
-magicdns-egress-proxy-forwarding remove forwarding
+magicdns-egress-proxy-forwarding remove forwarding || true
 
 if [[ "${exit_code_service}" -eq 256 ]]; then
   if [[ "${exit_code_signal}" -ne 15 && "${exit_code_container}" -eq 0 ]]; then

@@ -18,8 +18,8 @@ bashio::log.info \
   "(by signal ${exit_code_signal})"
 
 if ! bashio::fs.file_exists "${MAGICDNS_INGRESS_PROXY_SUPPRESS_FORWARDING_CONFIGURATION_LOCATION}"; then
-  magicdns-ingress-proxy-forwarding setup drop
-  magicdns-ingress-proxy-forwarding remove forwarding
+  magicdns-ingress-proxy-forwarding setup drop || true
+  magicdns-ingress-proxy-forwarding remove forwarding || true
 fi
 
 if [[ "${exit_code_service}" -eq 256 ]]; then

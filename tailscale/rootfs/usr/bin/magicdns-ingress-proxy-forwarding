@@ -7,6 +7,9 @@
 readonly MAGIC_DNS_IPV4="100.100.100.100"
 readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
 
+readonly HASSIO_IPV4_CIDR="172.30.32.1/23"
+readonly HASSIO_IPV6_CIDR="fd0c:ac1e:2100::1/48"
+
 declare hassio_ipv4_enabled="false"
 declare hassio_ipv6_enabled="false"
 
@@ -63,12 +66,12 @@ function remove_forwarding() {
 
 # hassio's IP availability
 if ip address show dev hassio \
-  | grep -q 'inet 172.30.32.1/23'
+  | grep -q "inet ${HASSIO_IPV4_CIDR}"
 then
   hassio_ipv4_enabled="true"
 fi
 if ip address show dev hassio \
-  | grep -q 'inet6 fd0c:ac1e:2100::1/48'
+  | grep -q "inet6 ${HASSIO_IPV6_CIDR}"
 then
   hassio_ipv6_enabled="true"
 fi

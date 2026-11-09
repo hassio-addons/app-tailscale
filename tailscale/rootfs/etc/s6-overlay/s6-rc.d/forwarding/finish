@@ -15,7 +15,7 @@ function remove_forwarding() {
   local address_bits="${4}"
   local from_address="${5}"
   local to_address
-  local name="${6}"
+  local chain_name="${6}"
 
   if bashio::var.has_value "${from_address}"; then
     for to_address in $( \
@@ -23,9 +23,9 @@ function remove_forwarding() {
       | { grep -E "^-A ${chain} -d ${from_address}/${address_bits} -j DNAT --to-destination \S+$" || true ;} \
       | sed -nr 's/^.*?--to-destination\s(\S+)$/\1/p')
     do
-      bashio::log.info "Removing the forwarding for ${name} connections from ${from_address} to ${to_address} (${ip_version})"
+      bashio::log.info "Removing the forwarding for ${chain_name} connections from ${from_address} to ${to_address} (${ip_version})"
       if ! ${cmd} -t nat -D "${chain}" -d "${from_address}" -j DNAT --to-destination "${to_address}"; then
-        bashio::log.warning "Removing forwarding for ${name} connections is unsuccessful (${ip_version})"
+        bashio::log.warning "Removing forwarding for ${chain_name} connections is unsuccessful (${ip_version})"
       fi
     done
   fi

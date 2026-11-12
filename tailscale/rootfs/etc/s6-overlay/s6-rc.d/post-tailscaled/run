@@ -109,8 +109,7 @@ unset IFS
 # - Running
 # Note: {} is used instead of () to achieve && precedence over || without subshell,
 #   subshell would not update the value of nostate_started_timestamp here
-while ! bashio::fs.socket_exists "/var/run/tailscale/tailscaled.sock" || \
-  ! backend_state=$( \
+while ! backend_state=$( \
     /opt/tailscale status --json --peers=false --self=false \
     | jq -rcM '.BackendState') || \
   [[ ! "${backend_state}" = @(NoState|Stopped|NeedsLogin|NeedsMachineAuth|Running) ]] || \

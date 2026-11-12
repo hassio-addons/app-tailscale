@@ -54,19 +54,23 @@ fi
 if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
   # Running the regular way, no resolv.conf replacement
   if bashio::config.false 'log_suppression' ; then
-    exec /opt/tailscaled "${options[@]}"
+    exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+      /opt/tailscaled "${options[@]}"
   else
-    exec /opt/tailscaled "${options[@]}" \
-      2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
+    exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+      /opt/tailscaled "${options[@]}" \
+        2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
   fi
 else
   # Using fake resolv.conf
   bashio::log.info "Using dnsmasq as upstream DNS server for tailscaled"
   bashio::net.wait_for 53 "$(awk '{ print $2 }' < /etc/resolv.for-tailscaled.conf)"
   if bashio::config.false 'log_suppression' ; then
-    exec unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")"
+    exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+      unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")"
   else
-    exec unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")" \
-      2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
+    exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+      unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")" \
+        2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
   fi
 fi

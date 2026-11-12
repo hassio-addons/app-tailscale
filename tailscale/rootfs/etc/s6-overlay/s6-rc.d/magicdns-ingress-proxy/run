@@ -91,7 +91,8 @@ if bashio::var.equals "${MAGICDNS_MODE}" "RESTRICTED"; then
   options+=(--address=/#/)
   for domain in "${white_list[@]}"; do
     bashio::log.info "  ${domain}"
-    options+=("--server=/${domain}/${magic_dns_address}")
+    # port 5553 is redirected to MagicDNS's port 53 by iptables rule
+    options+=("--server=/${domain}/${magic_dns_address}#5553")
   done
 elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
   # Everything except domains in black-white-list are allowed
@@ -101,7 +102,8 @@ elif bashio::var.equals "${MAGICDNS_MODE}" "UNRESTRICTED"; then
 
   # Forward everything to MagicDNS, except the black_list
   bashio::log.info "MagicDNS ingress proxy: forwarding everything to ${magic_dns_address}${black_list:+, except}"
-  options+=("--server=${magic_dns_address}")
+  # port 5553 is redirected to MagicDNS's port 53 by iptables rule
+  options+=("--server=${magic_dns_address}#5553")
   for domain in "${black_list[@]}"; do
     bashio::log.info "  ${domain}"
     options+=("--server=/${domain}/")
@@ -117,8 +119,5 @@ else
   printf '%s' "${dnsmasq_ingress_port}" > "${DNSMASQ_INGRESS_PORT_LOCATION}"
 fi
 
-# We need to delay the starting of the dependent services until iptables are configured
-echo "" >&3
-exec 3>&-
-
-exec dnsmasq "${options[@]}"
+exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+  dnsmasq "${options[@]}"

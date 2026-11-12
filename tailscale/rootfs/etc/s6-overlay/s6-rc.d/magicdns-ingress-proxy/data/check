@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+set -o errexit
+set -o errtrace
+set -o nounset
+set -o pipefail
+shopt -s inherit_errexit
+
+readonly MAGIC_DNS_IPV4="100.100.100.100"
+readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
+
+declare dns_name
+
+dns_name=$(/opt/tailscale status --json --peers=false --self=false | jq -rcM '.Self.DNSName')
+
+{ [[ -z "$(/opt/tailscale ip -4 2>/dev/null || true)" ]] || \
+  [[ -n "$(dig "@${MAGIC_DNS_IPV4}" "${dns_name}" +short)" ]] } && \
+{ [[ -z "$(/opt/tailscale ip -6 2>/dev/null || true)" ]] || \
+  [[ -n "$(dig "@${MAGIC_DNS_IPV6}" "${dns_name}" +short)" ]] }

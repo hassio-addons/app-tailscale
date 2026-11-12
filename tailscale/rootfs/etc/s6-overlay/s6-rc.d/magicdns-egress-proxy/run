@@ -109,8 +109,5 @@ if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
   echo "nameserver ${DNSMASQ_EGRESS_ADDRESS_IPV4}" > /etc/resolv.for-tailscaled.conf
 fi
 
-# We need to delay the starting of the dependent services until iptables are configured and the conf file is written
-echo "" >&3
-exec 3>&-
-
-exec dnsmasq "${options[@]}"
+exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+  dnsmasq "${options[@]}"

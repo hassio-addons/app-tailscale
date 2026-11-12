@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+set -o errexit
+set -o errtrace
+set -o nounset
+set -o pipefail
+shopt -s inherit_errexit
+
+readonly DNSMASQ_EGRESS_ADDRESS_IPV4="127.100.100.100"
+readonly DEFAULT_LOGIN_SERVER_1="controlplane.tailscale.com"
+
+[[ -n "$(dig "@${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${DEFAULT_LOGIN_SERVER_1}" +short)" ]]

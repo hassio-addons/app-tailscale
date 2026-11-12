@@ -19,47 +19,92 @@ declare tailscale_address_ipv6
 function setup_forwarding() {
   local cmd="${1}"
   local sub_cmd="${2}"
-  local proto="${3}"
-  local ip_version="${4}"
-  local address_bits="${5}"
-  local from_address="${6}"
-  local to_address="${7}"
-  local to_port="${8}"
-  local name="${9}"
+  local chain="${3}"
+  local proto="${4}"
+  local ip_version="${5}"
+  local address_bits="${6}"
+  local from_address="${7}"
+  local from_port="${8}"
+  local to_address="${9}"
+  local to_port="${10}"
+  local name="${11}"
+  local chain_name="${12}"
 
-  bashio::log.info "Setting up ${name} for MagicDNS ingress proxy (${proto}, ${ip_version})"
-  if ${cmd} -t nat -S PREROUTING \
-    | grep -Eq "^-A PREROUTING -d ${from_address//[\[\]]/}/${address_bits} -i hassio -p ${proto} -m ${proto} --dport 53 -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):${to_port}$"
+  bashio::log.info "Setting up ${name} for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
+  if ${cmd} -t nat -S "${chain}" \
+    | grep -Eq "^-A ${chain} -d ${from_address//[\[\]]/}/${address_bits} -p ${proto} -m ${proto} --dport ${from_port} -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):${to_port}$"
   then
-    bashio::log.notice "${name^} is already set for MagicDNS ingress proxy (${proto}, ${ip_version})"
+    bashio::log.notice "${name^} is already set for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
   else
-    if ! ${cmd} -t nat "-${sub_cmd}" PREROUTING -d "${from_address//[\[\]]/}" -i hassio -p "${proto}" --dport 53 -j DNAT --to-destination "${to_address}:${to_port}"; then
-      bashio::exit.nok "Setting up ${name} for MagicDNS ingress proxy is unsuccessful (${proto}, ${ip_version})"
+    if ! ${cmd} -t nat "-${sub_cmd}" "${chain}" -d "${from_address//[\[\]]/}" -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
+      bashio::exit.nok "Setting up ${name} for ${chain_name} connections to MagicDNS ingress proxy is unsuccessful (${proto}, ${from_port}, ${ip_version})"
+    fi
+  fi
+}
+
+function setup_accepting() {
+  local cmd="${1}"
+  local proto="${2}"
+  local ip_version="${3}"
+  local address_bits="${4}"
+  local from_address="${5}"
+
+  bashio::log.info "Setting up accepting for MagicDNS ingress proxy local reply (${proto}, ${ip_version})"
+  if ${cmd} -S INPUT \
+    | grep -Eq "^-A INPUT -s ${from_address//[\[\]]/}/${address_bits} -i lo -p ${proto} -m ${proto} --sport 53 -j ACCEPT"
+  then
+    bashio::log.notice "Accepting is already set for MagicDNS ingress proxy local reply (${proto}, ${ip_version})"
+  else
+    if ! ${cmd} -I INPUT 1 -i lo -s "${from_address//[\[\]]/}" -p "${proto}" --sport 53 -j ACCEPT; then
+      bashio::exit.nok "Setting up accepting for MagicDNS ingress proxy local reply is unsuccessful (${proto}, ${ip_version})"
     fi
   fi
 }
 
 function remove_forwarding() {
   local cmd="${1}"
-  local ip_version="${2}"
-  local address_bits="${3}"
-  local from_address="${4}"
-  local to_address="${5}"
-  local name="${6}"
+  local chain="${2}"
+  local ip_version="${3}"
+  local address_bits="${4}"
+  local from_address="${5}"
+  local from_port="${6}"
+  local to_address="${7}"
+  local name="${8}"
+  local chain_name="${9}"
 
   local variables
   local proto
   local to_port
 
   for variables in $( \
-    ${cmd} -t nat -S PREROUTING \
-    | { grep -E "^-A PREROUTING -d ${from_address//[\[\]]/}/${address_bits} -i hassio -p \S+ -m \S+ --dport 53 -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):\d+$" || true ;} \
+    ${cmd} -t nat -S "${chain}" \
+    | { grep -E "^-A ${chain} -d ${from_address//[\[\]]/}/${address_bits} -p \S+ -m \S+ --dport ${from_port} -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):\d+$" || true ;} \
     | sed -nr 's/^.*?-p\s(\S+).*?:(\d+)$/\1|\2/p')
   do
     IFS='|' read -r proto to_port <<< "${variables}"
-    bashio::log.info "Removing ${name} for MagicDNS ingress proxy (${proto}, ${ip_version})"
-    if ! ${cmd} -t nat -D PREROUTING -d "${from_address//[\[\]]/}" -i hassio -p "${proto}" --dport 53 -j DNAT --to-destination "${to_address}:${to_port}"; then
-      bashio::log.warning "Removing ${name} for MagicDNS ingress proxy is unsuccessful (${proto}, ${ip_version})"
+    bashio::log.info "Removing ${name} for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
+    if ! ${cmd} -t nat -D ${chain} -d "${from_address//[\[\]]/}" -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
+      bashio::log.warning "Removing ${name} for ${chain_name} connections to MagicDNS ingress proxy is unsuccessful (${proto}, ${from_port}, ${ip_version})"
+    fi
+  done
+}
+
+function remove_accepting() {
+  local cmd="${1}"
+  local ip_version="${2}"
+  local address_bits="${3}"
+  local from_address="${4}"
+
+  local proto
+
+  for proto in $( \
+    ${cmd} -S INPUT \
+    | { grep -E "^-A INPUT -s ${from_address//[\[\]]/}/${address_bits} -i lo -p \S+ -m \S+ --sport 53 -j ACCEPT" || true ;} \
+    | sed -nr 's/^.*?-p\s(\S+).*$/\1/p')
+  do
+    bashio::log.info "Removing accepting for MagicDNS ingress proxy local reply (${proto}, ${ip_version})"
+    if ! ${cmd} -D INPUT -s "${from_address//[\[\]]/}" -i lo -p "${proto}" --sport 53 -j ACCEPT; then
+      bashio::log.warning "Removing accepting for MagicDNS ingress proxy local reply is unsuccessful (${proto}, ${ip_version})"
     fi
   done
 }
@@ -105,12 +150,16 @@ case "${1-}-${2-}" in
     # This temporary trick is needed, because when TS starts, it adds a general ACCEPT FORWARD line in front of existing settings,
     # so we have to drop it during PREROUTING.
     if bashio::var.true "${hassio_ipv4_enabled}"; then
-      setup_forwarding "iptables" "I" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "127.0.0.1" "0" "${2}"
-      setup_forwarding "iptables" "I" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "127.0.0.1" "0" "${2}"
+      setup_forwarding "iptables" "I" "PREROUTING" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "incoming"
+      setup_forwarding "iptables" "I" "PREROUTING" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "incoming"
+      setup_forwarding "iptables" "I" "OUTPUT" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "local"
+      setup_forwarding "iptables" "I" "OUTPUT" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "local"
     fi
     if bashio::var.true "${hassio_ipv6_enabled}"; then
-      setup_forwarding "ip6tables" "I" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "[::1]" "0" "${2}"
-      setup_forwarding "ip6tables" "I" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "[::1]" "0" "${2}"
+      setup_forwarding "ip6tables" "I" "PREROUTING" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "incoming"
+      setup_forwarding "ip6tables" "I" "PREROUTING" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "incoming"
+      setup_forwarding "ip6tables" "I" "OUTPUT" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "local"
+      setup_forwarding "ip6tables" "I" "OUTPUT" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "local"
     fi
     ;;
   setup-forwarding)
@@ -120,24 +169,44 @@ case "${1-}-${2-}" in
       exit 1
     fi
     if bashio::var.true "${hassio_ipv4_enabled}" && bashio::var.has_value "${tailscale_address_ipv4}"; then
-      setup_forwarding "iptables" "A" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "${tailscale_address_ipv4}" "${3}" "${2}"
-      setup_forwarding "iptables" "A" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "${tailscale_address_ipv4}" "${3}" "${2}"
+      setup_forwarding "iptables" "A" "OUTPUT" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "53" "${2}" "local"
+      setup_forwarding "iptables" "A" "OUTPUT" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "53" "${2}" "local"
+      setup_accepting "iptables" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}"
+      setup_accepting "iptables" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}"
+      setup_forwarding "iptables" "A" "PREROUTING" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "incoming"
+      setup_forwarding "iptables" "A" "PREROUTING" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "incoming"
+      setup_forwarding "iptables" "A" "OUTPUT" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "local"
+      setup_forwarding "iptables" "A" "OUTPUT" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "local"
     fi
     if bashio::var.true "${hassio_ipv6_enabled}" && bashio::var.has_value "${tailscale_address_ipv6}"; then
-      setup_forwarding "ip6tables" "A" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "[${tailscale_address_ipv6}]" "${3}" "${2}"
-      setup_forwarding "ip6tables" "A" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "[${tailscale_address_ipv6}]" "${3}" "${2}"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "53" "${2}" "local"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "53" "${2}" "local"
+      setup_accepting "ip6tables" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}"
+      setup_accepting "ip6tables" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}"
+      setup_forwarding "ip6tables" "A" "PREROUTING" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "incoming"
+      setup_forwarding "ip6tables" "A" "PREROUTING" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "incoming"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "local"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "local"
     fi
     ;;
   remove-drop)
-    remove_forwarding "iptables" "IPv4" "32" "${MAGIC_DNS_IPV4}" "127.0.0.1" "${2}"
-    remove_forwarding "ip6tables" "IPv6" "128" "${MAGIC_DNS_IPV6}" "[::1]" "${2}"
+    remove_forwarding "iptables" "PREROUTING" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "${2}" "incoming"
+    remove_forwarding "ip6tables" "PREROUTING" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "${2}" "incoming"
+    remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "${2}" "local"
+    remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "${2}" "local"
     ;;
   remove-forwarding)
     if bashio::var.has_value "${tailscale_address_ipv4}"; then
-      remove_forwarding "iptables" "IPv4" "32" "${MAGIC_DNS_IPV4}" "${tailscale_address_ipv4}" "${2}"
+      remove_forwarding "iptables" "PREROUTING" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${2}" "incoming"
+      remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${2}" "local"
+      remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "${2}" "local"
+      remove_accepting "iptables" "IPv4" "32" "${MAGIC_DNS_IPV4}"
     fi
     if bashio::var.has_value "${tailscale_address_ipv6}"; then
-      remove_forwarding "ip6tables" "IPv6" "128" "${MAGIC_DNS_IPV6}" "[${tailscale_address_ipv6}]" "${2}"
+      remove_forwarding "ip6tables" "PREROUTING" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${2}" "incoming"
+      remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${2}" "local"
+      remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "${2}" "local"
+      remove_accepting "ip6tables" "IPv6" "128" "${MAGIC_DNS_IPV6}"
     fi
     ;;
   *)

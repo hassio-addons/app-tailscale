@@ -15,6 +15,7 @@ readonly DNSMASQ_INGRESS_PORT_LOCATION="/run/dnsmasq_ingress_port"
 
 declare magicdns_proxies_configuration
 declare healthy=true
+declare readiness_reported=false
 
 function restart_proxies() {
   bashio::log.info "MagicDNS proxy configuration has changed"
@@ -45,13 +46,15 @@ function restart_proxies() {
 bashio::log.info "Subscribing to IPN message bus..."
 # After version v1.102 TS doesn't emit the NetMap in IPN messages, we should detect the Notify.SelfChange signal, then query the DNS status.
 # Details: https://github.com/tailscale/tailscale/commit/aa5da2e5f22a785f345e0a05dd8a318a8a50976e
-# The --initial=true flag is intentionally not used, there is no equivalent for the SelfChange signal, we echo a dummy SelfChange signal instead.
+# The --initial=true flag is intentionally not used, there is no equivalent for the SelfChange signal,
+#   we replace the successful connection message on the first log line with a dummy SelfChange signal instead.
 # The jq emits only empty lines, there is no usable DNS info in the messages.
-{ echo '{"SelfChange":true}'; /opt/tailscale debug watch-ipn; } \
-| stdbuf -i0 -oL -eL jq -rcM 'select(.SelfChange != null) | ""' \
+/opt/tailscale debug watch-ipn \
+  2> >(tee /dev/fd/2 | awk -F $'\n' -e 'NR==1 && index($0,"Connected.")==1 { print "{\"SelfChange\":true}" }') \
+| jq --unbuffered -rcM 'select(.SelfChange != null) | ""' \
 | while IFS= read -r
 do
-  # On the first run and on subsequent SelfChange events we compare the current
+  # On startup and on subsequent SelfChange events we compare the current
   # DNS state with the previous call of configure-magicdns-proxies script.
   # The configure-magicdns-proxies script is first called from the
   # magicdns-proxies-configurator service, then from this service.
@@ -72,6 +75,11 @@ do
       if bashio::try.failed; then
         bashio::exit.nok "Failed to reconfigure and restart MagicDNS proxies. Halting app to prevent network loss."
       fi
+    fi
+    if bashio::var.false "${readiness_reported}"; then
+      echo "" >&3
+      exec 3>&-
+      readiness_reported=true
     fi
   fi
 done

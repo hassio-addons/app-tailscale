@@ -8,6 +8,8 @@
 readonly WAIT_DELAY=5   # 5s
 readonly WAIT_COUNT=18  # 18*5s = 90s = 1.5m
 
+readonly CHECK_FILTER_LOCATION=/run/share-homeassistant-check-filter
+
 declare wait_counter=0
 declare curl_result
 
@@ -15,6 +17,9 @@ declare curl_protocol
 declare tailscale_protocol
 declare -a curl_options
 declare -a tailscale_options
+
+declare dns_name
+declare check_filter
 
 # Validate share_homeassistant value
 if ! bashio::config.equals 'share_homeassistant' 'serve' && \
@@ -94,9 +99,11 @@ else
   fi
 fi
 
-# This service can wait for HA for minutes, let notify S6 when we are really starting
-echo "" >&3
-exec 3>&-
+# Prepare jq filter for readiness check
+dns_name=$(/opt/tailscale status --json --peers=false --self=false | jq -rcM '.Self.DNSName')
+check_filter=".Foreground | to_entries.[].value | select(.Web.\"${dns_name::-1}:$(bashio::config 'share_on_port')\".Handlers.\"/\".Proxy==\"${tailscale_protocol}://127.0.0.1:$(bashio::core.port)\") | . != null"
+echo "${check_filter}" > "${CHECK_FILTER_LOCATION}"
 
 # Set up serve or funnel
-exec /opt/tailscale "${tailscale_options[@]}"
+exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+  /opt/tailscale "${tailscale_options[@]}"

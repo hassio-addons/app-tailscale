@@ -1,0 +1,55 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Protects local subnet from redirection
+# ==============================================================================
+
+readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
+readonly LISTENER_QUEUE="${NM_DISPATCHER_MONITOR_FIFODIR}/protect-subnets"
+
+declare action
+declare subnet_routes_to_unprotect
+declare subnet_routes_to_protect
+
+mkfifo "${LISTENER_QUEUE}"
+
+# Pin it to prevent closing it by other processes
+exec 4<>"${LISTENER_QUEUE}"
+
+protect-subnet-routes
+
+# Readiness trigger
+echo 'ping' > "${LISTENER_QUEUE}"
+
+while IFS= read -r -u 4 action
+do
+  case "${action}" in
+    up|down)
+      bashio::log.info "Handling Network Manager action ${action}"
+      unprotect-subnet-routes
+      bashio::try protect-subnet-routes
+      if bashio::try.failed; then
+        bashio::exit.nok "Failed to protect subnet routes. Halting app to prevent network loss."
+      fi
+      ;;
+    dhcp4-change|dhcp6-change)
+      # Do anything only when the addresses are really changed
+      subnet_routes_to_unprotect="$(unprotect-subnet-routes test)"
+      subnet_routes_to_protect="$(protect-subnet-routes test)"
+      if ! bashio::var.equals "${subnet_routes_to_unprotect}" "${subnet_routes_to_protect}"; then
+        bashio::log.info "Handling Network Manager action ${action}"
+        unprotect-subnet-routes
+        bashio::try protect-subnet-routes tested
+        if bashio::try.failed; then
+          bashio::exit.nok "Failed to protect subnet routes. Halting app to prevent network loss."
+        fi
+      fi
+      ;;
+    ping)
+      # Readiness notification
+      echo "" >&3
+      exec 3>&-
+      ;;
+  esac
+done

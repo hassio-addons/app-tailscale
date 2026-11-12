@@ -10,14 +10,17 @@ readonly exit_code_service="${1}"
 readonly exit_code_signal="${2}"
 readonly service="${3}"
 
-readonly NM_DISPATCHER_LISTENER_QUEUE=/run/nm-dispatcher-listener-queue
+readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
+readonly LISTENER_QUEUE="${NM_DISPATCHER_MONITOR_FIFODIR}/protect-subnets"
 
 bashio::log.info \
   "Service ${service} exited with code ${exit_code_service}" \
   "(by signal ${exit_code_signal})"
 
+unprotect-subnet-routes
+
 exec 4>&-
-rm -rf "${NM_DISPATCHER_LISTENER_QUEUE}"
+rm -f "${LISTENER_QUEUE}/"
 
 if [[ "${exit_code_service}" -eq 256 ]]; then
   if [[ "${exit_code_signal}" -ne 15 && "${exit_code_container}" -eq 0 ]]; then

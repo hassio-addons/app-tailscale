@@ -1,0 +1,55 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Monitors the nm-dispatcher service calls
+# ==============================================================================
+
+# Note: do not use S6 fifodir-s, they are for one-time, not for continuous event listeners
+
+readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
+
+declare ping_pid
+declare nm_dispatcher_action
+declare fifo
+
+mkdir "${NM_DISPATCHER_MONITOR_FIFODIR}"
+
+# When busctl is used with --json, it doesn't emit the usual "Monitoring bus message stream" what we could use for readiness.
+# This sends a ping signal, and stops on it's own if parent dies.
+bash -c '
+  sleep .5
+  while :; do
+    busctl --system emit /app/tailscale/nm_dispatcher/readiness app.tailscale.nm_dispatcher.readiness Action s ping
+    sleep 1
+    kill -0 "$0" 2>/dev/null || exit 0
+  done
+' $$ &
+ping_pid=$!
+
+# Compared to nm-dispatcher this doesn't register itself as a real nm-dispatcher (there can be only one on D-Bus),
+# just captures the nm-dispatcher actions.
+busctl --system --json=short monitor \
+  --match "type='method_call',interface='org.freedesktop.nm_dispatcher'" \
+  --match "type='signal',interface='app.tailscale.nm_dispatcher.readiness'" \
+| jq --unbuffered -rcM 'select(.member=="Action" or .member=="Action2") | .payload.data[0]' \
+| while read -r nm_dispatcher_action
+do
+  case "${nm_dispatcher_action}" in
+    up|down|dhcp4-change|dhcp6-change|reapply)
+      for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR}/*"; do
+        if ! echo "${nm_dispatcher_action}" > "${fifo}"; then
+          bashio::log.fatal "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
+          echo -n 1 > /run/s6-linux-init-container-results/exitcode
+          exec /run/s6/basedir/bin/halt
+        fi
+      done
+      ;;
+    ping)
+      # Readiness notification
+      kill ${ping_pid}
+      echo "" >&3
+      exec 3>&-
+      ;;
+  esac
+done

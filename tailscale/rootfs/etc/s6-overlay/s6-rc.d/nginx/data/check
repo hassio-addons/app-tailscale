@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+set -o errexit
+set -o errtrace
+set -o nounset
+set -o pipefail
+shopt -s inherit_errexit
+
+declare host_port
+
+host_port="$(sed '2q;d' /etc/nginx/servers/ingress.conf | awk '{print $2}' | tr ':' '/')"
+
+{ >"/dev/tcp/${host_port}"; } 2>/dev/null

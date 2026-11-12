@@ -16,4 +16,5 @@ options+=(--listen 127.0.0.1:25899)
 options+=(--readonly)
 
 # Run Tailscale
-exec /opt/tailscale web "${options[@]}"
+exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+  /opt/tailscale web "${options[@]}"

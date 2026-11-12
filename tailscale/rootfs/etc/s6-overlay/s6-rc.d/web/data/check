@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+set -o errexit
+set -o errtrace
+set -o nounset
+set -o pipefail
+shopt -s inherit_errexit
+
+{ >/dev/tcp/localhost/25899; } 2>/dev/null

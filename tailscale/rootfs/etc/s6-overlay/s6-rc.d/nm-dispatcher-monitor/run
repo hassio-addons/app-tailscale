@@ -15,13 +15,13 @@ declare fifo
 
 mkdir "${NM_DISPATCHER_MONITOR_FIFODIR}"
 
-# When busctl is used with --json, it doesn't emit the usual "Monitoring bus message stream" what we could use for readiness.
+# When busctl is used with --json, it doesn't emit the usual "Monitoring bus message stream" what we could use for readiness trigger.
 # This sends a ping signal, and stops on it's own if parent dies.
 bash -c '
   sleep .5
   while :; do
     busctl --system emit /app/tailscale/nm_dispatcher/readiness app.tailscale.nm_dispatcher.readiness Action s ping
-    sleep 1
+    sleep .5
     kill -0 "$0" 2>/dev/null || exit 0
   done
 ' $$ &
@@ -47,9 +47,11 @@ do
       ;;
     ping)
       # Readiness notification
-      kill ${ping_pid}
-      echo "" >&3
-      exec 3>&-
+      # In case we receive multiple ping messages, we notify only on the first
+      if kill ${ping_pid} 2>/dev/null; then
+        echo "" >&3
+        exec 3>&-
+      fi
       ;;
   esac
 done

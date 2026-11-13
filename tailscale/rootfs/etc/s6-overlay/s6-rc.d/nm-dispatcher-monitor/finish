@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # ==============================================================================
 # Home Assistant Community App: Tailscale
-# Take down the S6 supervision tree when nm-dispatcher fails
+# Take down the S6 supervision tree when nm-dispatcher-monitor fails
 # ==============================================================================
 exit_code_container=$(</run/s6-linux-init-container-results/exitcode)
 readonly exit_code_container

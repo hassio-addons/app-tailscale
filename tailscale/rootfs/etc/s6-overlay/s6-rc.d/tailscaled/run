@@ -59,7 +59,7 @@ if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
   else
     exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
       /opt/tailscaled "${options[@]}" \
-        2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
+        2> >(awk -F $'\n' -e "${awk_program}")
   fi
 else
   # Using fake resolv.conf
@@ -71,6 +71,6 @@ else
   else
     exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
       unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")" \
-        2> >(stdbuf -i0 -oL -eL awk -F $'\n' -e "${awk_program}")
+        2> >(awk -F $'\n' -e "${awk_program}")
   fi
 fi

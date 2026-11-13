@@ -10,4 +10,6 @@ shopt -s inherit_errexit
 readonly DNSMASQ_EGRESS_ADDRESS_IPV4="127.100.100.100"
 readonly DEFAULT_LOGIN_SERVER_1="controlplane.tailscale.com"
 
-[[ -n "$(dig "@${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${DEFAULT_LOGIN_SERVER_1}" +short)" ]]
+declare result
+
+result=$(dig "@${DNSMASQ_EGRESS_ADDRESS_IPV4}" "${DEFAULT_LOGIN_SERVER_1}" +short 2>/dev/null) && [[ -n "${result}" ]]

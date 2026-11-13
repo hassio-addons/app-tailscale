@@ -11,10 +11,11 @@ readonly MAGIC_DNS_IPV4="100.100.100.100"
 readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
 
 declare dns_name
+declare result
 
 dns_name=$(/opt/tailscale status --json --peers=false --self=false | jq -rcM '.Self.DNSName')
 
 { [[ -z "$(/opt/tailscale ip -4 2>/dev/null || true)" ]] || \
-  [[ -n "$(dig "@${MAGIC_DNS_IPV4}" "${dns_name}" +short)" ]] } && \
+  { result=$(dig "@${MAGIC_DNS_IPV4}" "${dns_name}" +short 2>/dev/null) && [[ -n "${result}" ]] } } && \
 { [[ -z "$(/opt/tailscale ip -6 2>/dev/null || true)" ]] || \
-  [[ -n "$(dig "@${MAGIC_DNS_IPV6}" "${dns_name}" +short)" ]] }
+  { result=$(dig "@${MAGIC_DNS_IPV6}" "${dns_name}" +short 2>/dev/null) && [[ -n "${result}" ]] } }

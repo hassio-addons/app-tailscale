@@ -119,5 +119,8 @@ else
   printf '%s' "${dnsmasq_ingress_port}" > "${DNSMASQ_INGRESS_PORT_LOCATION}"
 fi
 
+# For readiness check
+options+=(--host-record=readiness.ingress.tailscale.app,127.0.0.1,::1,0)
+
 exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
   dnsmasq "${options[@]}"

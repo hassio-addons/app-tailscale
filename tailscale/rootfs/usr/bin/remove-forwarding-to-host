@@ -1,0 +1,56 @@
+#!/usr/bin/env bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Remove forwarding to the host's primary interface
+# ==============================================================================
+
+declare from_address_ipv4 from_address_ipv6
+
+# In case of non userspace networking, remove the forwarding from tailnet to host
+function remove_forwarding() {
+  local cmd="${1}"
+  local chain="${2}"
+  local ip_version="${3}"
+  local address_bits="${4}"
+  local from_address="${5}"
+  local chain_name="${6}"
+  local test="${7-}"
+
+  local to_address
+
+  if bashio::var.has_value "${from_address}"; then
+    for to_address in $( \
+      ${cmd} -t nat -S "${chain}" \
+      | { grep -E "^-A ${chain} -d ${from_address}/${address_bits} -j DNAT --to-destination \S+$" || true ;} \
+      | sed -nr 's/^.*?--to-destination\s(\S+)$/\1/p')
+    do
+      if bashio::var.has_value "${test}"; then
+        echo "${to_address}"
+      else
+        bashio::log.info "Removing the forwarding for ${chain_name} connections from ${from_address} to ${to_address} (${ip_version})"
+        if ! ${cmd} -t nat -D "${chain}" -d "${from_address}" -j DNAT --to-destination "${to_address}"; then
+          bashio::log.warning "Removing forwarding for ${chain_name} connections is unsuccessful (${ip_version})"
+        fi
+      fi
+    done
+  fi
+}
+
+if ! [[ "${1-}" =~ ^(|test)$ ]]; then
+  echo "Usage: $(basename "$0") [test]" 1>&2
+  exit 1
+fi
+
+# Tailscale's IP addresses
+from_address_ipv4=$(/opt/tailscale ip -4 2>/dev/null || true)
+from_address_ipv6=$(/opt/tailscale ip -6 2>/dev/null || true)
+
+if [[ "${1-}" == "test" ]]; then
+  remove_forwarding "iptables" "PREROUTING" "" "32" "${from_address_ipv4}" "" "test"
+  remove_forwarding "ip6tables" "PREROUTING" "" "128" "${from_address_ipv6}" "" "test"
+else
+  remove_forwarding "iptables" "PREROUTING" "IPv4" "32" "${from_address_ipv4}" "incoming"
+  remove_forwarding "ip6tables" "PREROUTING" "IPv6" "128" "${from_address_ipv6}" "incoming"
+  remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${from_address_ipv4}" "local"
+  remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${from_address_ipv6}" "local"
+fi

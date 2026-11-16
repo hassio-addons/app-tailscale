@@ -5,97 +5,44 @@
 # Forward incoming tailnet connections to the host's primary interface
 # ==============================================================================
 
-declare from_address_ipv4 from_address_ipv6
-declare to_address_ipv4 to_address_ipv6
+readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
+readonly LISTENER_QUEUE="${NM_DISPATCHER_MONITOR_FIFODIR}/forwarding"
 
-# Return address without prefix, or error if not forwardable
-function get_forwardable_address() {
-  local address=${1}
-  local ipinfo
+declare action
+declare local_addresses_to_remove
+declare local_addresses_to_setup
 
-  if ! bashio::var.has_value "${address}"; then
-    return 1
-  fi
+mkfifo "${LISTENER_QUEUE}"
 
-  # Check if forwarding for the address family is enabled
-  if [[ "${address}" =~ .*:.* ]]; then
-    if [[ $(</proc/sys/net/ipv6/conf/all/forwarding) -eq 0 ]]; then
-      return 1
-    fi
-  else
-    if [[ $(</proc/sys/net/ipv4/ip_forward) -eq 0 ]]; then
-      return 1
-    fi
-  fi
+# Pin it to prevent closing it by other processes
+exec 4<>"${LISTENER_QUEUE}"
 
-  if ! ipinfo="$(ipcalc --json "${address}")"; then
-    bashio::log.debug "Address ${address} is not valid: ${ipinfo}"
-    return 1
-  fi
+# Startup/readiness trigger
+echo 'init' > "${LISTENER_QUEUE}"
 
-  bashio::jq "${ipinfo}" '.ADDRESS'
-}
-
-# Host's IP addresses, it never fails, but can return empty
-function get_host_address() {
-  local ip_version="${1}"
-
-  # The function name is composed from ip_version, and the address list is
-  # deliberately unquoted so it splits into one word per address
-  # shellcheck disable=SC2086
-  if ! bashio::var.equals "$(bashio::network.${ip_version}_method)" "disabled"; then
-    # shellcheck disable=SC2086
-    for address in $(bashio::network.${ip_version}_address); do
-      if get_forwardable_address "${address}"; then
-        break
-      else
-        bashio::log.debug "Skipping non-forwardable ${ip_version} address: ${address}"
+while IFS= read -r -u 4 action
+do
+  case "${action}" in
+    up|down)
+      bashio::log.info "Handling Network Manager action ${action} in forwarding service"
+      remove-forwarding-to-host
+      setup-forwarding-to-host
+      ;;
+    dhcp4-change|dhcp6-change|reapply)
+      # Do anything only when the addresses are really changed
+      local_addresses_to_remove="$(remove-forwarding-to-host test)"
+      local_addresses_to_setup="$(setup-forwarding-to-host test)"
+      if ! bashio::var.equals "${local_addresses_to_remove}" "${local_addresses_to_setup}"; then
+        bashio::log.info "Handling Network Manager action ${action} in forwarding service"
+        remove-forwarding-to-host
+        setup-forwarding-to-host
       fi
-    done
-  fi
-}
-
-# In case of non userspace networking, forward incoming tailnet connections to the host's primary interface
-function setup_forwarding() {
-  local cmd="${1}"
-  local chain="${2}"
-  local ip_version="${3}"
-  local address_bits="${4}"
-  local from_address="${5}"
-  local to_address="${6}"
-  local chain_name="${7}"
-
-  if bashio::var.has_value "${from_address}" && bashio::var.has_value "${to_address}"; then
-    bashio::log.info \
-      "Forwarding ${chain_name} tailnet connections directed to ${from_address} to the host's ${to_address} address (${ip_version})"
-    if ${cmd} -t nat -S "${chain}" \
-      | grep -Eq "^-A ${chain} -d ${from_address}/${address_bits} -j DNAT --to-destination ${to_address}$"
-    then
-      bashio::log.notice "Forwarding for ${chain_name} connections is already set (${ip_version})"
-    else
-      # Difference compared to Tailscale's docker image: using only -A append, less intrusive than -I insert
-      if ! ${cmd} -t nat -A "${chain}" -d "${from_address}" -j DNAT --to-destination "${to_address}"; then
-        bashio::log.warning "Setting up forwarding for ${chain_name} connections is unsuccessful (${ip_version})"
-      fi
-    fi
-  fi
-}
-
-if ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null"; then
-  bashio::log.warning \
-    "The host has no primary (default) interface, can't forward incoming tailnet connections to the host." \
-    "Restart of the app is required after the issue is fixed!"
-else
-  # Tailscale's IP addresses
-  from_address_ipv4=$(/opt/tailscale ip -4 2>/dev/null || true)
-  from_address_ipv6=$(/opt/tailscale ip -6 2>/dev/null || true)
-
-  # Host's IP addresses
-  to_address_ipv4=$(get_host_address "ipv4")
-  to_address_ipv6=$(get_host_address "ipv6")
-
-  setup_forwarding "iptables" "PREROUTING" "IPv4" "32" "${from_address_ipv4}" "${to_address_ipv4}" "incoming"
-  setup_forwarding "ip6tables" "PREROUTING" "IPv6" "128" "${from_address_ipv6}" "${to_address_ipv6}" "incoming"
-  setup_forwarding "iptables" "OUTPUT" "IPv4" "32" "${from_address_ipv4}" "${to_address_ipv4}" "local"
-  setup_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${from_address_ipv6}" "${to_address_ipv6}" "local"
-fi
+      ;;
+    init)
+      setup-forwarding-to-host
+      # Readiness notification
+      echo "" >&3
+      exec 3>&-
+      ;;
+  esac
+done

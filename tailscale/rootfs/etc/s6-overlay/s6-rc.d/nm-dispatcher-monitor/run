@@ -9,9 +9,13 @@
 
 readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
 
+readonly WAIT_DELAY=5   # 5s
+readonly WAIT_COUNT=60  # 60*5s = 300s = 5m
+
 declare ping_pid
 declare nm_dispatcher_action
 declare readiness_reported=false
+declare wait_counter=0
 declare fifo
 
 # use -p in case of the service is restarted
@@ -45,6 +49,26 @@ do
   fi
   case "${nm_dispatcher_action}" in
     up|down|dhcp4-change|dhcp6-change|reapply)
+      # Drop cached network info
+      bashio::cache.flush_all
+
+      # It is possible to get "ERROR: Got unexpected response from the API: System is not ready with state: setup"
+      # Test both networking and config Supervisor API availability, these APIs are called in dependent services
+      # And wait a little on inaccessibility
+      while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null" || \
+        ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
+      do
+        if (( wait_counter++ == WAIT_COUNT )); then
+          bashio::exit.nok "Supervisor is unreachable. Halting app to prevent network loss."
+        fi
+        bashio::log.info "Waiting for the supervisor to be ready..."
+        sleep $WAIT_DELAY
+      done
+      if (( wait_counter != 0 )); then
+        bashio::log.info "Supervisor is ready"
+      fi
+
+      # Notify subscribed services
       for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR:?}/"*; do
         if [[ -p "$fifo" ]] && ! echo "${nm_dispatcher_action}" | dd conv=nocreat oflag=nonblock of="${fifo}" &>/dev/null; then
           # It's only a warning, the main cause can be a finish script removing the fifo after iterating the folder here

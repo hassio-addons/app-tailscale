@@ -6,37 +6,14 @@
 # ==============================================================================
 
 readonly PROTECTION_RULE_PRIORITY=5000
-readonly WAIT_DELAY=5   # 5s
-readonly WAIT_COUNT=60  # 60*5s = 300s = 5m
 
 declare -a routes=()
 declare route family
 declare response
-declare wait_counter=0
 
-if ! [[ "${1-}" =~ ^(|test|tested)$ ]]; then
-  echo "Usage: $(basename "$0") [test|tested]" 1>&2
+if ! [[ "${1-}" =~ ^(|test)$ ]]; then
+  echo "Usage: $(basename "$0") [test]" 1>&2
   exit 1
-fi
-
-if [[ "${1-}" != "tested" ]]; then
-  # If it is called after network configuration is changed, we need to drop cached network info
-  bashio::cache.flush_all
-  # It is possible to get "ERROR: Got unexpected response from the API: System is not ready with state: setup"
-  # Test both networking and config Supervisor API availability, these APIs are called in subnet-routes script
-  # And wait a little on inaccessibility
-  while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null" || \
-    ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
-  do
-    if (( wait_counter++ == WAIT_COUNT )); then
-      bashio::exit.nok "Supervisor is unreachable"
-    fi
-    bashio::log.info "Waiting for the supervisor to be ready..."
-    sleep $WAIT_DELAY
-  done
-  if (( wait_counter != 0 )); then
-    bashio::log.info "Supervisor is ready"
-  fi
 fi
 
 readarray -t routes < <(subnet-routes local)

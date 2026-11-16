@@ -32,7 +32,7 @@ do
   fi
   case "${action}" in
     up|down)
-      bashio::log.info "Handling Network Manager action ${action}"
+      bashio::log.info "Handling Network Manager action ${action} in protect-subnets service"
       unprotect-subnet-routes
       bashio::try protect-subnet-routes
       if bashio::try.failed; then
@@ -44,7 +44,7 @@ do
       subnet_routes_to_unprotect="$(unprotect-subnet-routes test)"
       subnet_routes_to_protect="$(protect-subnet-routes test)"
       if ! bashio::var.equals "${subnet_routes_to_unprotect}" "${subnet_routes_to_protect}"; then
-        bashio::log.info "Handling Network Manager action ${action}"
+        bashio::log.info "Handling Network Manager action ${action} in protect-subnets service"
         unprotect-subnet-routes
         bashio::try protect-subnet-routes
         if bashio::try.failed; then

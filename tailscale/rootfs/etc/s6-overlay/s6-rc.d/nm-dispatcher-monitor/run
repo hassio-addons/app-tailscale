@@ -39,9 +39,7 @@ do
     up|down|dhcp4-change|dhcp6-change|reapply)
       for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR}/*"; do
         if ! echo "${nm_dispatcher_action}" > "${fifo}"; then
-          bashio::log.fatal "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
-          echo -n 1 > /run/s6-linux-init-container-results/exitcode
-          exec /run/s6/basedir/bin/halt
+          bashio::exit.nok "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
         fi
       done
       ;;

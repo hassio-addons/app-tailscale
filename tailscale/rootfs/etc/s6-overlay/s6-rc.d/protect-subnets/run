@@ -17,10 +17,8 @@ mkfifo "${LISTENER_QUEUE}"
 # Pin it to prevent closing it by other processes
 exec 4<>"${LISTENER_QUEUE}"
 
-protect-subnet-routes
-
-# Readiness trigger
-echo 'ping' > "${LISTENER_QUEUE}"
+# Startup/readiness trigger
+echo 'init' > "${LISTENER_QUEUE}"
 
 while IFS= read -r -u 4 action
 do
@@ -46,7 +44,8 @@ do
         fi
       fi
       ;;
-    ping)
+    init)
+      protect-subnet-routes
       # Readiness notification
       echo "" >&3
       exec 3>&-

@@ -1,8 +1,7 @@
 """Regression checks for first-start imports of existing Tailscale Services."""
 
+import json
 import os
-import re
-import shlex
 import subprocess
 import unittest
 from pathlib import Path
@@ -15,25 +14,68 @@ RUN_SCRIPT = (
 
 
 class ServicesImportTests(unittest.TestCase):
-    """Guard imports against target rewrites and duplicate configurations."""
+    """Exercise the production import loop with small bashio stubs."""
 
     @classmethod
     def setUpClass(cls):
-        cls.script = RUN_SCRIPT.read_text(encoding="utf-8")
-        start = cls.script.index("    # Import services\n")
+        script = RUN_SCRIPT.read_text(encoding="utf-8")
+        start = script.index("    while IFS= read -r service\n", script.index("    # Import services\n"))
         end_marker = '    done <<<"$(bashio::jq "${importable_services}")"'
-        end = cls.script.index(end_marker, start) + len(end_marker)
-        cls.import_block = cls.script[start:end]
+        end = script.index(end_marker, start) + len(end_marker)
+        cls.import_loop = script[start:end]
+
+    def run_import(self, target, existing=""):
+        service = json.dumps(
+            {"name": "svc:test", "target": target, "port": 80}, separators=(",", ":")
+        )
+        stubs = r'''
+ bashio::jq() {
+   local input=$1 query=${2:-}
+   if [[ $# -eq 1 ]]; then
+     printf '%s\n' "$input"
+   else
+     python3 -c 'import json,sys; obj=json.loads(sys.argv[1]); key=sys.argv[2].split()[0].lstrip("."); value=obj.get(key); print("" if value is None else value)' "$input" "$query"
+   fi
+ }
+ bashio::var.equals() { [[ "$1" == "$2" ]]; }
+ bashio::var.has_value() { [[ -n "$1" ]]; }
+ bashio::var.json() {
+   python3 -c 'import json,sys; a=sys.argv[1:]; d={};
+for k,v in zip(a[::2],a[1::2]):
+ d[k]=int(v[1:]) if k=="port" and v.startswith("^") else v
+print(json.dumps(d,separators=(",",":")),end="")' "$@"
+ }
+ bashio::log.info() { :; }
+ bashio::log.notice() { :; }
+'''
+        setup = "\n".join(
+            (
+                'declare -A service_protocols=(["svc:test|80"]="http")',
+                'declare -a configured_services=()',
+                'if [[ -n "${EXISTING_SERVICE:-}" ]]; then configured_services+=("${EXISTING_SERVICE}"); fi',
+                'declare service service_name target protocol port path service_config anything_imported=false',
+                'declare -a service_config_args=()',
+                f"importable_services={json.dumps(service)}",
+                stubs,
+            )
+        )
+        script = "\n".join(
+            (
+                "set -e",
+                setup,
+                self.import_loop,
+                'printf "COUNT=%d\\nIMPORTED=%s\\n" "${#configured_services[@]}" "$anything_imported"',
+                'printf "CONFIG=%s\\n" "${configured_services[@]}"',
+            )
+        )
+        env = {"PATH": os.defpath, "EXISTING_SERVICE": existing}
+        result = subprocess.run(
+            ["bash", "-c", script], capture_output=True, text=True, env=env, check=True
+        )
+        fields = dict(line.split("=", 1) for line in result.stdout.splitlines())
+        return fields
 
     def test_import_preserves_local_and_remote_targets(self):
-        target_assignments = [
-            line.strip()
-            for line in self.import_block.splitlines()
-            if re.match(r"^\s*target=", line)
-        ]
-        extraction = 'target=$(bashio::jq "${service}" \'.target\')'
-        self.assertEqual([extraction], target_assignments)
-
         targets = (
             "http://127.0.0.1:8123",
             "http://localhost:8123",
@@ -43,50 +85,21 @@ class ServicesImportTests(unittest.TestCase):
         )
         for target in targets:
             with self.subTest(target=target):
-                env = {"PATH": os.defpath, "IMPORT_TARGET": target}
-                result = subprocess.run(
-                    [
-                        "bash",
-                        "-c",
-                        "bashio::jq() { printf '%s' \"$IMPORT_TARGET\"; }; "
-                        "service='{}'; "
-                        f"{extraction}; "
-                        "printf '%s\\n' \"$target\"",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                    check=True,
-                )
-                self.assertEqual(f"{target}\n", result.stdout)
+                result = self.run_import(target)
+                imported = json.loads(result["CONFIG"])
+                self.assertEqual(target, imported["target"])
+                self.assertEqual("1", result["COUNT"])
+                self.assertEqual("true", result["IMPORTED"])
 
     def test_matching_existing_service_is_not_imported_twice(self):
-        marker = "    # The right hand side is quoted on purpose: the space padded values are"
-        start = self.import_block.index(marker)
-        match = re.search(
-            r"      if \[\[ .*?\n      fi\n", self.import_block[start:], re.DOTALL
-        )
-        self.assertIsNotNone(match, "could not locate the import duplicate guard")
-        guard = match.group(0)
-        service = (
-            '{"name":"svc:test","target":"http://192.168.1.131:80",'
-            '"protocol":"http","port":80}'
-        )
-        program = "\n".join(
-            (
-                f"configured_services=({shlex.quote(service)})",
-                f"service_config={shlex.quote(service)}",
-                "anything_imported=false",
-                "bashio::log.notice() { :; }",
-                guard,
-                "printf 'count=%d imported=%s\\n' "
-                '"${#configured_services[@]}" "$anything_imported"',
-            )
-        )
-        result = subprocess.run(
-            ["bash", "-c", program], capture_output=True, text=True, check=True
-        )
-        self.assertEqual("count=1 imported=false\n", result.stdout)
+        target = "http://192.168.1.131:80"
+        imported = self.run_import(target)
+        existing = imported["CONFIG"]
+
+        result = self.run_import(target, existing=existing)
+        self.assertEqual("1", result["COUNT"])
+        self.assertEqual("false", result["IMPORTED"])
+        self.assertEqual(existing, result["CONFIG"])
 
 
 if __name__ == "__main__":

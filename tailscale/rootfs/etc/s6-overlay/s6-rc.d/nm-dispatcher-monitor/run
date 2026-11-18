@@ -14,7 +14,7 @@ readonly WAIT_COUNT=60  # 60*5s = 300s = 5m
 
 declare ping_pid
 declare nm_dispatcher_action
-declare wait_counter=0
+declare wait_counter
 declare fifo
 
 mkdir "${NM_DISPATCHER_MONITOR_FIFODIR}"
@@ -47,6 +47,7 @@ do
       # It is possible to get "ERROR: Got unexpected response from the API: System is not ready with state: setup"
       # Test both networking and config Supervisor API availability, these APIs are called in dependent services
       # And wait a little on inaccessibility
+      wait_counter=0
       while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null" || \
         ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
       do

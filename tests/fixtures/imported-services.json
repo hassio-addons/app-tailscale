@@ -1,0 +1,39 @@
+[
+  {
+    "name": "svc:db",
+    "target": "tcp://192.168.1.20:5432",
+    "protocol": "tcp",
+    "port": 5432
+  },
+  {
+    "name": "svc:dns",
+    "target": "http://nas.local:8080",
+    "protocol": "http",
+    "port": 80
+  },
+  {
+    "name": "svc:tls",
+    "target": "tcp://[fd00::10]:443",
+    "protocol": "tls-terminated-tcp",
+    "port": 8443
+  },
+  {
+    "name": "svc:web",
+    "target": "http://localhost:8123",
+    "protocol": "https",
+    "port": 443
+  },
+  {
+    "name": "svc:web",
+    "target": "https+insecure://192.168.1.50:8443",
+    "protocol": "https",
+    "port": 443,
+    "path": "/api"
+  },
+  {
+    "name": "svc:web",
+    "target": "http://127.0.0.1:8123",
+    "protocol": "http",
+    "port": 80
+  }
+]

@@ -344,9 +344,9 @@ Port 443 is used by default.
 
 ### Option: `services`
 
-This option allows you to advertise services reachable from this app as Tailscale
-Services, including services running on other devices on your network. Each service
-needs a name, a target address, a protocol, and a port to expose it on.
+This option allows you to advertise services as Tailscale Services, either
+running on this device or reachable from it. Each service needs a name, a target
+address, furthermore a protocol, and a port to expose it on.
 
 This option is disabled by default.
 
@@ -359,18 +359,12 @@ name.
 
 - The service `name` must include the `svc:` prefix.
 
-- The `target` must use an IPv4 address, a bracketed IPv6 address, or a DNS
-  hostname reachable from this app, including `127.0.0.1` or `localhost` for
-  services on this device. Use `http://`,
+- The `target` must be an address reachable from this app: an IPv4 address, a
+  bracketed IPv6 address or a DNS hostname, followed by a port. Use `http://`,
   `https://` or `https+insecure://` targets for HTTP/HTTPS protocols, and
   `tcp://` targets for TCP and tls-terminated-tcp protocols, for example
-  `http://127.0.0.1:13378`, `http://192.168.1.100:8080`,
-  `http://[fd00::1]:8080`, or `http://server.local:8080`. An explicit target
-  port between 1 and 65535 is required. IPv4-shaped hosts, including those with
-  a trailing DNS dot, must use decimal octets from 0 to 255 without leading
-  zeros; they cannot bypass validation as hostnames. Tailscale validates the
-  remaining hostname and IPv6 semantics. URL paths in targets are not supported
-  by this option.
+  `http://127.0.0.1:13378`, `http://192.168.1.100:8080` or
+  `http://[fd00::1]:8080`.
 
 - Supported protocols by which the target will be presented:
 

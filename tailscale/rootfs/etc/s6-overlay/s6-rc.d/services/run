@@ -116,9 +116,6 @@ if ! bashio::fs.file_exists "/data/services_import_is_done"; then
       path=$(bashio::jq "${service}" '.path // empty')
       protocol="${service_protocols["${service_name}|${port}"]}"
 
-      # Replace any localhost or 127.1.2.3 addresses with 127.0.0.1
-      target=${target/:*:/://127.0.0.1:}
-
       # Remove the default '/' path
       if bashio::var.equals "${path}" '/'; then
         path=''

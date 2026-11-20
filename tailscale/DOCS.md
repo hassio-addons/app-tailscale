@@ -344,9 +344,9 @@ Port 443 is used by default.
 
 ### Option: `services`
 
-This option allows you to advertise services as Tailscale Services, either
-running on this device or reachable from it. Each service needs a name, a target
-address, furthermore a protocol, and a port to expose it on.
+This option allows you to advertise services running on this device, or
+reachable from it, as Tailscale Services. Each service needs a name, a target
+address, a protocol, and a port to expose it on.
 
 This option is disabled by default.
 

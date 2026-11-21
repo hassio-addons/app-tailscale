@@ -24,6 +24,8 @@ if [[ -s "${DNSMASQ_INGRESS_PORT_LOCATION}" ]]; then
   # in case forwarding is only set up by the magicdns-proxies-reconfigurator service, check dnsmasq process existence only
   pgrep -f "^dnsmasq.*?--listen-address=${tailscale_address_ipv6}.*?--port=$(<"${DNSMASQ_INGRESS_PORT_LOCATION}")"
 else
+  # The shellcheck is false alarm
+  # shellcheck disable=SC1083
   { [[ -z "${tailscale_address_ipv4}" ]] || \
     { result=$(dig "@${MAGIC_DNS_IPV4}" readiness.ingress.tailscale.app A +short 2>/dev/null) && [[ -n "${result}" ]] } } && \
   { [[ -z "${tailscale_address_ipv6}" ]] || \

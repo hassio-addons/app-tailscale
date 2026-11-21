@@ -120,6 +120,8 @@ else
 fi
 
 # For readiness check
+# The shellcheck is false alarm
+# shellcheck disable=SC2054
 options+=(--host-record=readiness.ingress.tailscale.app,127.0.0.1,::1,0)
 
 exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \

@@ -83,7 +83,7 @@ function remove_forwarding() {
   do
     IFS='|' read -r proto to_port <<< "${variables}"
     bashio::log.info "Removing ${name} for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
-    if ! ${cmd} -t nat -D ${chain} -d "${from_address//[\[\]]/}" -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
+    if ! ${cmd} -t nat -D "${chain}" -d "${from_address//[\[\]]/}" -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
       bashio::log.warning "Removing ${name} for ${chain_name} connections to MagicDNS ingress proxy is unsuccessful (${proto}, ${from_port}, ${ip_version})"
     fi
   done

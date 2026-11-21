@@ -37,7 +37,7 @@ busctl --system --json=short monitor \
 do
   case "${nm_dispatcher_action}" in
     up|down|dhcp4-change|dhcp6-change|reapply)
-      for fifo in ${NM_DISPATCHER_MONITOR_FIFODIR}/*; do
+      for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR:?}/"*; do
         if [[ -p "$fifo" ]] && ! echo "${nm_dispatcher_action}" > "${fifo}"; then
           bashio::exit.nok "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
         fi

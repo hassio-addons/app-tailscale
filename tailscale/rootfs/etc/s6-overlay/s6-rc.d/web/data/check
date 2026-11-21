@@ -7,4 +7,4 @@ set -o nounset
 set -o pipefail
 shopt -s inherit_errexit
 
-{ >/dev/tcp/localhost/25899; } 2>/dev/null
+{ :>/dev/tcp/localhost/25899; } 2>/dev/null

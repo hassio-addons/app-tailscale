@@ -9,4 +9,5 @@
 mkdir -p /share/taildrop
 
 # Fetch files
-exec /opt/tailscale file get --verbose --loop "/share/taildrop"
+exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+  /opt/tailscale file get --verbose --loop "/share/taildrop"

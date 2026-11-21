@@ -5,8 +5,14 @@
 # Runs the Nginx daemon
 # ==============================================================================
 
-# Wait for the Tailscale webinterface to become available
-bashio::net.wait_for 25899 localhost 900
+# Generate Ingress configuration
+bashio::var.json \
+    interface "$(bashio::app.ip_address)" \
+    port "^$(bashio::app.ingress_port)" \
+    | tempio \
+        -template /etc/nginx/templates/ingress.gtpl \
+        -out /etc/nginx/servers/ingress.conf
 
 bashio::log.info "Starting NGinx..."
-exec nginx
+exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
+  nginx

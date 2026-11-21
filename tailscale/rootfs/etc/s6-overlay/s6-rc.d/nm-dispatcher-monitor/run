@@ -1,0 +1,99 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Tailscale
+# Monitors the nm-dispatcher service calls
+# ==============================================================================
+
+# Note: do not use S6 fifodir-s, they are for one-time, not for continuous event listeners
+
+# Fix race condition in bashio
+bashio::cache.flush_all() {
+    bashio::log.trace "${FUNCNAME[0]}"
+
+    if ! bashio::fs.directory_exists "${__BASHIO_CACHE_DIR}"; then
+        return "${__BASHIO_EXIT_OK}"
+    fi
+
+    if ! rm -f -r "${__BASHIO_CACHE_DIR:?}/"{*,.*}; then
+        bashio::exit.nok "Could not flush cache"
+        return "${__BASHIO_EXIT_NOK}"
+    fi
+
+    return "${__BASHIO_EXIT_OK}"
+}
+
+readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
+
+readonly WAIT_DELAY=5   # 5s
+readonly WAIT_COUNT=60  # 60*5s = 300s = 5m
+
+declare ping_pid
+declare nm_dispatcher_action
+declare wait_counter
+declare fifo
+
+mkdir "${NM_DISPATCHER_MONITOR_FIFODIR}"
+
+# When busctl is used with --json, it doesn't emit the usual "Monitoring bus message stream" what we could use for readiness trigger.
+# This sends a ping signal, and stops on it's own if parent dies.
+bash -c '
+  sleep .5
+  while :; do
+    busctl --system emit /app/tailscale/nm_dispatcher/readiness app.tailscale.nm_dispatcher.readiness Action s ping
+    sleep .5
+    kill -0 "$0" 2>/dev/null || exit 0
+  done
+' $$ &
+ping_pid=$!
+
+# Compared to nm-dispatcher this doesn't register itself as a real nm-dispatcher (there can be only one on D-Bus),
+# just captures the nm-dispatcher actions.
+busctl --system --json=short monitor \
+  --match "type='method_call',interface='org.freedesktop.nm_dispatcher'" \
+  --match "type='signal',interface='app.tailscale.nm_dispatcher.readiness'" \
+| jq --unbuffered -rcM 'select(.member=="Action" or .member=="Action2") | .payload.data[0]' \
+| while read -r nm_dispatcher_action
+do
+  case "${nm_dispatcher_action}" in
+    up|down|dhcp4-change|dhcp6-change|reapply)
+      # Wait for the Supervisor to update itself with the changed data
+      sleep 1
+
+      # Drop cached network info
+      bashio::cache.flush_all
+
+      # It is possible to get "ERROR: Got unexpected response from the API: System is not ready with state: setup"
+      # Test both networking and config Supervisor API availability, these APIs are called in dependent services
+      # And wait a little on inaccessibility
+      wait_counter=0
+      while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null" || \
+        ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
+      do
+        if (( wait_counter++ == WAIT_COUNT )); then
+          bashio::exit.nok "Supervisor is unreachable. Halting app to prevent network loss."
+        fi
+        bashio::log.info "Waiting for the supervisor to be ready..."
+        sleep $WAIT_DELAY
+      done
+      if (( wait_counter != 0 )); then
+        bashio::log.info "Supervisor is ready"
+      fi
+
+      # Notify subscribed services
+      for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR:?}/"*; do
+        if [[ -p "$fifo" ]] && ! echo "${nm_dispatcher_action}" > "${fifo}"; then
+          bashio::exit.nok "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
+        fi
+      done
+      ;;
+    ping)
+      # Readiness notification
+      # In case we receive multiple ping messages, we notify only on the first
+      if kill ${ping_pid} 2>/dev/null; then
+        echo "" >&3
+        exec 3>&-
+      fi
+      ;;
+  esac
+done

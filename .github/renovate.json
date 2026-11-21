@@ -53,7 +53,7 @@
     {
       "description": "Packages that live in the Alpine community repository",
       "matchDatasources": ["custom.alpine"],
-      "matchPackageNames": ["alpine_3_24/ipcalc", "alpine_3_24/networkmanager"],
+      "matchPackageNames": ["alpine_3_24/busctl", "alpine_3_24/ipcalc"],
       "registryUrls": [
         "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/"
       ]

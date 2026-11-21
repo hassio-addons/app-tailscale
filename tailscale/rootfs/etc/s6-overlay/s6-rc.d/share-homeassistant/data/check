@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+set -o errexit
+set -o errtrace
+set -o nounset
+set -o pipefail
+shopt -s inherit_errexit
+
+readonly CHECK_FILTER_LOCATION=/run/share-homeassistant-check-filter
+
+/opt/tailscale serve status --json=true \
+| jq -e -f "${CHECK_FILTER_LOCATION}" &>/dev/null

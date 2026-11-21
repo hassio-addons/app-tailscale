@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+set -o errexit
+set -o errtrace
+set -o nounset
+set -o pipefail
+shopt -s inherit_errexit
+
+pgrep -af '/opt/tailscale file get --verbose --loop /share/taildrop' &>/dev/null

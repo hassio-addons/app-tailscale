@@ -22,7 +22,7 @@ tailscale_address_ipv6=$(/opt/tailscale ip -6 2>/dev/null || true)
 
 if [[ -s "${DNSMASQ_INGRESS_PORT_LOCATION}" ]]; then
   # in case forwarding is only set up by the magicdns-proxies-reconfigurator service, check dnsmasq process existence only
-  pgrep -f "^dnsmasq.*?--listen-address=${tailscale_address_ipv6}.*?--port=$(<"${DNSMASQ_INGRESS_PORT_LOCATION}")"
+  pgrep -f "^dnsmasq.*?--listen-address=${tailscale_address_ipv6}.*?--port=$(<"${DNSMASQ_INGRESS_PORT_LOCATION}")" &>/dev/null
 else
   # The shellcheck is false alarm
   # shellcheck disable=SC1083

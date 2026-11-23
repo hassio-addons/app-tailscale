@@ -64,7 +64,6 @@ if ! bashio::fs.file_exists "/etc/resolv.for-tailscaled.conf"; then
 else
   # Using fake resolv.conf
   bashio::log.info "Using dnsmasq as upstream DNS server for tailscaled"
-  bashio::net.wait_for 53 "$(awk '{ print $2 }' < /etc/resolv.for-tailscaled.conf)"
   if bashio::config.false 'log_suppression' ; then
     exec s6-notifyoncheck -d -s 500 -w 500 -n 0 \
       unshare -m bash -c "mount --bind /etc/resolv.for-tailscaled.conf /etc/resolv.conf; exec /opt/tailscaled $(printf "\"%s\" " "${options[@]}")"

@@ -20,7 +20,7 @@ bashio::log.info \
 unprotect-subnet-routes || true
 
 exec 4>&-
-rm -f "${LISTENER_QUEUE}/"
+rm -f "${LISTENER_QUEUE}"
 
 if [[ "${exit_code_service}" -eq 256 ]]; then
   if [[ "${exit_code_signal}" -ne 15 && "${exit_code_container}" -eq 0 ]]; then

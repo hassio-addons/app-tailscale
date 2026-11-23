@@ -79,10 +79,10 @@ do
         bashio::exit.nok "Failed to reconfigure and restart MagicDNS proxies. Halting app to prevent network loss."
       fi
     fi
-    if bashio::var.false "${readiness_reported}"; then
-      echo "" >&3
-      exec 3>&-
-      readiness_reported=true
-    fi
+  fi
+  if bashio::var.false "${readiness_reported}"; then
+    echo "" >&3
+    exec 3>&-
+    readiness_reported=true
   fi
 done

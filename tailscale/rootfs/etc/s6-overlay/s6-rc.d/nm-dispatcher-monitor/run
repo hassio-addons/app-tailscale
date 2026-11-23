@@ -12,8 +12,10 @@ readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
 declare ping_pid
 declare nm_dispatcher_action
 declare fifo
+declare readiness_reported=false
 
-mkdir "${NM_DISPATCHER_MONITOR_FIFODIR}"
+# use -p in case of the service is restarted
+mkdir -p "${NM_DISPATCHER_MONITOR_FIFODIR}"
 
 # When busctl is used with --json, it doesn't emit the usual "Monitoring bus message stream" what we could use for readiness trigger.
 # This sends a ping signal, and stops on it's own if parent dies.
@@ -35,21 +37,21 @@ busctl --system --json=short monitor \
 | jq --unbuffered -rcM 'select(.member=="Action" or .member=="Action2") | .payload.data[0]' \
 | while read -r nm_dispatcher_action
 do
+  if bashio::var.false "${readiness_reported}"; then
+    kill ${ping_pid} 2>/dev/null || true
+    echo "" >&3
+    exec 3>&-
+    readiness_reported=true
+  fi
   case "${nm_dispatcher_action}" in
     up|down|dhcp4-change|dhcp6-change|reapply)
       for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR:?}/"*; do
         if [[ -p "$fifo" ]] && ! echo "${nm_dispatcher_action}" > "${fifo}"; then
+          # To abort the pipeline from a subshell, we need to abort the leftmost command also
+          kill $(pgrep -f "^busctl.*?app.tailscale.nm_dispatcher.readiness'$") || true
           bashio::exit.nok "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
         fi
       done
-      ;;
-    ping)
-      # Readiness notification
-      # In case we receive multiple ping messages, we notify only on the first
-      if kill ${ping_pid} 2>/dev/null; then
-        echo "" >&3
-        exec 3>&-
-      fi
       ;;
   esac
 done

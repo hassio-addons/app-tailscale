@@ -21,11 +21,12 @@ exec 4<>"${LISTENER_QUEUE}"
 # Startup/readiness trigger
 echo 'init' > "${LISTENER_QUEUE}"
 
+protect-subnet-routes
+
 while IFS= read -r -u 4 action
 do
   # Due to race with nm-dispatcher-monitor, it's possible that the init event is not the first in the queue
   if bashio::var.false "${readiness_reported}"; then
-    protect-subnet-routes
     echo "" >&3
     exec 3>&-
     readiness_reported=true

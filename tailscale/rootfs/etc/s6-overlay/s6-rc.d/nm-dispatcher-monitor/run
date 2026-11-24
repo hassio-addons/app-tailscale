@@ -75,7 +75,7 @@ do
       # Test both networking and config Supervisor API availability, these APIs are called in dependent services
       # And wait a little on inaccessibility
       wait_counter=0
-      while ! eval "bashio::api.supervisor GET /network/interface/default/info false &> /dev/null ${LOG_FD}> /dev/null" || \
+      while ! eval "bashio::api.supervisor GET /network/info false &> /dev/null ${LOG_FD}> /dev/null" || \
         ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
       do
         if (( wait_counter++ == WAIT_COUNT )); then

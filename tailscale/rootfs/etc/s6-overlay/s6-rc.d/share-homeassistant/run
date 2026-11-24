@@ -50,8 +50,6 @@ fi
 
 curl_options+=(-s)
 curl_options+=(-o/dev/null)
-curl_options+=(--connect-timeout 0.5)
-curl_options+=(--max-time 0.5)
 curl_options+=(-w"%{http_code}")
 
 tailscale_options+=("$(bashio::config 'share_homeassistant')")
@@ -75,7 +73,7 @@ curl_options+=("${curl_protocol}://127.0.0.1:$(bashio::core.port)")
 tailscale_options+=("${tailscale_protocol}://127.0.0.1:$(bashio::core.port)")
 
 # Wait a bit for HA to be available during startup
-while (( 200 != (curl_result=$(curl "${curl_options[@]}")) )); do
+while (( 200 != (curl_result=$(curl --connect-timeout 0.5 --max-time 0.5 "${curl_options[@]}")) )); do
   if (( wait_counter++ == WAIT_COUNT )); then
     break
   fi
@@ -93,8 +91,7 @@ if (( 200 != curl_result )); then
   bashio::log.warning "Home Assistant is not accessible currently, unable to test the connection to Home Assistant as reverse proxy"
 else
   # Test Home Assistant's HTTP/HTTPS reverse proxy configuration
-  curl_options+=(-H "X-Forwarded-For: 127.0.0.1")
-  if (( 200 != $(curl "${curl_options[@]}") )); then
+  if (( 200 != $(curl -H "X-Forwarded-For: 127.0.0.1" "${curl_options[@]}") )); then
     bashio::exit.nok \
       "Unable to connect to Home Assistant as reverse proxy." \
       "Please check your configuration based on the app's documentation under \"Option: share_homeassistant\"."

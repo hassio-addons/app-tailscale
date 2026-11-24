@@ -157,10 +157,10 @@ case "${1-}-${2-}" in
     if bashio::var.is_empty "${tailscale_address_ipv4}" && bashio::var.is_empty "${tailscale_address_ipv6}"; then
       bashio::exit.nok "Failed to retrieve Tailscale's local address"
     fi
-    if ( (bashio::var.true "${hassio_ipv4_enabled}" && bashio::var.is_empty "${tailscale_address_ipv4}") && \
-        (bashio::var.false "${hassio_ipv6_enabled}" && bashio::var.has_value "${tailscale_address_ipv6}") ) || \
-      ( (bashio::var.false "${hassio_ipv4_enabled}" && bashio::var.has_value "${tailscale_address_ipv4}") && \
-        (bashio::var.true "${hassio_ipv6_enabled}" && bashio::var.is_empty "${tailscale_address_ipv6}") )
+    if ( bashio::var.true "${hassio_ipv4_enabled}" && bashio::var.is_empty "${tailscale_address_ipv4}" && \
+        bashio::var.false "${hassio_ipv6_enabled}" && bashio::var.has_value "${tailscale_address_ipv6}" ) || \
+      ( bashio::var.false "${hassio_ipv4_enabled}" && bashio::var.has_value "${tailscale_address_ipv4}" && \
+        bashio::var.true "${hassio_ipv6_enabled}" && bashio::var.is_empty "${tailscale_address_ipv6}" )
     then
       bashio::log.fatal "Failed to retrieve any Tailscale local address with matching IP version (v4 or v6) to Home Assistant's internal 'hassio' network"
       if bashio::var.true "${hassio_ipv4_enabled}"; then

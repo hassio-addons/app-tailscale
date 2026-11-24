@@ -9,6 +9,7 @@ readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
 readonly LISTENER_QUEUE="${NM_DISPATCHER_MONITOR_FIFODIR}/forwarding"
 
 declare action
+declare readiness_reported=false
 declare local_addresses_to_remove
 declare local_addresses_to_setup
 
@@ -22,6 +23,13 @@ echo 'init' > "${LISTENER_QUEUE}"
 
 while IFS= read -r -u 4 action
 do
+  # Due to race with nm-dispatcher-monitor, it's possible that the init event is not the first in the queue
+  if bashio::var.false "${readiness_reported}"; then
+    setup-forwarding-to-host
+    echo "" >&3
+    exec 3>&-
+    readiness_reported=true
+  fi
   case "${action}" in
     up|down)
       bashio::log.info "Handling Network Manager action ${action} in forwarding service"
@@ -37,12 +45,6 @@ do
         remove-forwarding-to-host
         setup-forwarding-to-host
       fi
-      ;;
-    init)
-      setup-forwarding-to-host
-      # Readiness notification
-      echo "" >&3
-      exec 3>&-
       ;;
   esac
 done

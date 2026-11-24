@@ -23,23 +23,24 @@ function setup_forwarding() {
   local cmd="${1}"
   local sub_cmd="${2}"
   local chain="${3}"
-  local proto="${4}"
-  local ip_version="${5}"
-  local address_bits="${6}"
-  local from_address="${7}"
-  local from_port="${8}"
-  local to_address="${9}"
-  local to_port="${10}"
-  local name="${11}"
-  local chain_name="${12}"
+  local interface="${4}"
+  local proto="${5}"
+  local ip_version="${6}"
+  local address_bits="${7}"
+  local from_address="${8}"
+  local from_port="${9}"
+  local to_address="${10}"
+  local to_port="${11}"
+  local name="${12}"
+  local chain_name="${13}"
 
   bashio::log.info "Setting up ${name} for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
   if ${cmd} -t nat -S "${chain}" \
-    | grep -Eq "^-A ${chain} -d ${from_address//[\[\]]/}/${address_bits} -p ${proto} -m ${proto} --dport ${from_port} -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):${to_port}$"
+    | grep -Eq "^-A ${chain} -d ${from_address//[\[\]]/}/${address_bits} ${interface:+-i ${interface} }-p ${proto} -m ${proto} --dport ${from_port} -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):${to_port}$"
   then
     bashio::log.notice "${name^} is already set for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
   else
-    if ! ${cmd} -t nat "-${sub_cmd}" "${chain}" -d "${from_address//[\[\]]/}" -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
+    if ! ${cmd} -t nat "-${sub_cmd}" "${chain}" -d "${from_address//[\[\]]/}" ${interface:+-i "${interface}"} -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
       bashio::exit.nok "Setting up ${name} for ${chain_name} connections to MagicDNS ingress proxy is unsuccessful (${proto}, ${from_port}, ${ip_version})"
     fi
   fi
@@ -76,17 +77,18 @@ function remove_forwarding() {
   local chain_name="${9}"
 
   local variables
+  local interface
   local proto
   local to_port
 
   for variables in $( \
     ${cmd} -t nat -S "${chain}" \
-    | { grep -E "^-A ${chain} -d ${from_address//[\[\]]/}/${address_bits} -p \S+ -m \S+ --dport ${from_port} -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):\d+$" || true ;} \
-    | sed -nr 's/^.*?-p\s(\S+).*?:(\d+)$/\1|\2/p')
+    | { grep -E "^-A ${chain} -d ${from_address//[\[\]]/}/${address_bits} (-i \S+ |)-p \S+ -m \S+ --dport ${from_port} -j DNAT --to-destination $(sed -r 's/(\[|\])/\\\1/g' <<< "${to_address}"):\d+$" || true ;} \
+    | sed -nr -e 's/^.*?-i\s(\S+).*?-p\s(\S+).*?:(\d+)$/\1|\2|\3/p' -e 's/^.*?-p\s(\S+).*?:(\d+)$/|\1|\2/p')
   do
-    IFS='|' read -r proto to_port <<< "${variables}"
+    IFS='|' read -r interface proto to_port <<< "${variables}"
     bashio::log.info "Removing ${name} for ${chain_name} connections to MagicDNS ingress proxy (${proto}, ${from_port}, ${ip_version})"
-    if ! ${cmd} -t nat -D "${chain}" -d "${from_address//[\[\]]/}" -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
+    if ! ${cmd} -t nat -D "${chain}" -d "${from_address//[\[\]]/}" ${interface:+-i "${interface}"} -p "${proto}" --dport "${from_port}" -j DNAT --to-destination "${to_address}:${to_port}"; then
       bashio::log.warning "Removing ${name} for ${chain_name} connections to MagicDNS ingress proxy is unsuccessful (${proto}, ${from_port}, ${ip_version})"
     fi
   done
@@ -124,58 +126,22 @@ then
   hassio_ipv6_enabled="true"
 fi
 
-# Tailscale's local IP addresses
-if ! bashio::var.equals "${1-}" "remove"; then
-  tailscale_address_ipv4=$(/opt/tailscale ip -4 2>/dev/null || true)
-  tailscale_address_ipv6=$(/opt/tailscale ip -6 2>/dev/null || true)
-  if bashio::var.is_empty "${tailscale_address_ipv4}" && bashio::var.is_empty "${tailscale_address_ipv6}"; then
-    bashio::exit.nok "Failed to retrieve Tailscale's local address"
-  fi
-  if ( (bashio::var.true "${hassio_ipv4_enabled}" && bashio::var.is_empty "${tailscale_address_ipv4}") && \
-      (bashio::var.false "${hassio_ipv6_enabled}" && bashio::var.has_value "${tailscale_address_ipv6}") ) || \
-    ( (bashio::var.false "${hassio_ipv4_enabled}" && bashio::var.has_value "${tailscale_address_ipv4}") && \
-      (bashio::var.true "${hassio_ipv6_enabled}" && bashio::var.is_empty "${tailscale_address_ipv6}") )
-  then
-    bashio::log.fatal "Failed to retrieve any Tailscale local address with matching IP version (v4 or v6) to Home Assistant's internal 'hassio' network"
-    if bashio::var.true "${hassio_ipv4_enabled}"; then
-      bashio::log.fatal "The internal hassio network is IPv4-only, while the tailnet is IPv6-only, enable IPv6 for docker with 'ha docker options --enable-ipv6=true'"
-    else
-      # This is only theoretical
-      bashio::log.fatal "The internal 'hassio' network is IPv6-only, while the tailnet is IPv4-only"
-    fi
-    bashio::exit.nok
-  fi
-  printf "%s" "${tailscale_address_ipv4}" > "${TAILSCALE_ADDRESS_IPV4_CACHE}"
-  printf "%s" "${tailscale_address_ipv6}" > "${TAILSCALE_ADDRESS_IPV6_CACHE}"
-else
-  if ! tailscale_address_ipv4="$(<"${TAILSCALE_ADDRESS_IPV4_CACHE}")" || \
-    ! tailscale_address_ipv6="$(<"${TAILSCALE_ADDRESS_IPV6_CACHE}")" || \
-    ( bashio::var.is_empty "${tailscale_address_ipv4-}" && bashio::var.is_empty "${tailscale_address_ipv6-}" )
-  then
-    bashio::exit.nok "Failed to load cached tailscale addresses"
-  fi
-fi
-
 case "${1-}-${2-}" in
   setup-drop)
     # Due to forwarding to localhost is not enabled in HA OS, this is de facto a DROP (see martian packets).
     # This temporary trick is needed, because when TS starts, it adds a general ACCEPT FORWARD line in front of existing settings,
     # so we have to drop it during PREROUTING.
-    if bashio::var.has_value "${tailscale_address_ipv4}"; then
-      setup_forwarding "iptables" "I" "OUTPUT" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "local"
-      setup_forwarding "iptables" "I" "OUTPUT" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "local"
-      if bashio::var.true "${hassio_ipv4_enabled}"; then
-        setup_forwarding "iptables" "I" "PREROUTING" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "incoming"
-        setup_forwarding "iptables" "I" "PREROUTING" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "incoming"
-      fi
+    setup_forwarding "iptables" "I" "OUTPUT" "" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "local"
+    setup_forwarding "iptables" "I" "OUTPUT" "" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "local"
+    if bashio::var.true "${hassio_ipv4_enabled}"; then
+      setup_forwarding "iptables" "I" "PREROUTING" "hassio" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "incoming"
+      setup_forwarding "iptables" "I" "PREROUTING" "hassio" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "127.0.0.1" "0" "${2}" "incoming"
     fi
-    if bashio::var.has_value "${tailscale_address_ipv6}"; then
-      setup_forwarding "ip6tables" "I" "OUTPUT" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "local"
-      setup_forwarding "ip6tables" "I" "OUTPUT" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "local"
-      if bashio::var.true "${hassio_ipv6_enabled}"; then
-        setup_forwarding "ip6tables" "I" "PREROUTING" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "incoming"
-        setup_forwarding "ip6tables" "I" "PREROUTING" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "incoming"
-      fi
+    setup_forwarding "ip6tables" "I" "OUTPUT" "" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "local"
+    setup_forwarding "ip6tables" "I" "OUTPUT" "" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "local"
+    if bashio::var.true "${hassio_ipv6_enabled}"; then
+      setup_forwarding "ip6tables" "I" "PREROUTING" "hassio" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "incoming"
+      setup_forwarding "ip6tables" "I" "PREROUTING" "hassio" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "0" "${2}" "incoming"
     fi
     ;;
   setup-forwarding)
@@ -184,28 +150,52 @@ case "${1-}-${2-}" in
       echo "Usage: $(basename "$0") setup forwarding port" 1>&2
       exit 1
     fi
+
+    # Tailscale's local IP addresses
+    tailscale_address_ipv4=$(/opt/tailscale ip -4 2>/dev/null || true)
+    tailscale_address_ipv6=$(/opt/tailscale ip -6 2>/dev/null || true)
+    if bashio::var.is_empty "${tailscale_address_ipv4}" && bashio::var.is_empty "${tailscale_address_ipv6}"; then
+      bashio::exit.nok "Failed to retrieve Tailscale's local address"
+    fi
+    if ( (bashio::var.true "${hassio_ipv4_enabled}" && bashio::var.is_empty "${tailscale_address_ipv4}") && \
+        (bashio::var.false "${hassio_ipv6_enabled}" && bashio::var.has_value "${tailscale_address_ipv6}") ) || \
+      ( (bashio::var.false "${hassio_ipv4_enabled}" && bashio::var.has_value "${tailscale_address_ipv4}") && \
+        (bashio::var.true "${hassio_ipv6_enabled}" && bashio::var.is_empty "${tailscale_address_ipv6}") )
+    then
+      bashio::log.fatal "Failed to retrieve any Tailscale local address with matching IP version (v4 or v6) to Home Assistant's internal 'hassio' network"
+      if bashio::var.true "${hassio_ipv4_enabled}"; then
+        bashio::log.fatal "The internal hassio network is IPv4-only, while the tailnet is IPv6-only, enable IPv6 for docker with 'ha docker options --enable-ipv6=true'"
+      else
+        # This is only theoretical
+        bashio::log.fatal "The internal 'hassio' network is IPv6-only, while the tailnet is IPv4-only"
+      fi
+      bashio::exit.nok
+    fi
+    printf "%s" "${tailscale_address_ipv4}" > "${TAILSCALE_ADDRESS_IPV4_CACHE}"
+    printf "%s" "${tailscale_address_ipv6}" > "${TAILSCALE_ADDRESS_IPV6_CACHE}"
+
     if bashio::var.has_value "${tailscale_address_ipv4}"; then
-      setup_forwarding "iptables" "A" "OUTPUT" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "53" "${2}" "local"
-      setup_forwarding "iptables" "A" "OUTPUT" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "53" "${2}" "local"
+      setup_forwarding "iptables" "A" "OUTPUT" "" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "53" "${2}" "local"
+      setup_forwarding "iptables" "A" "OUTPUT" "" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "5553" "${MAGIC_DNS_IPV4}" "53" "${2}" "local"
       setup_accepting "iptables" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}"
       setup_accepting "iptables" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}"
-      setup_forwarding "iptables" "A" "OUTPUT" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "local"
-      setup_forwarding "iptables" "A" "OUTPUT" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "local"
+      setup_forwarding "iptables" "A" "OUTPUT" "" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "local"
+      setup_forwarding "iptables" "A" "OUTPUT" "" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "local"
       if bashio::var.true "${hassio_ipv4_enabled}"; then
-        setup_forwarding "iptables" "A" "PREROUTING" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "incoming"
-        setup_forwarding "iptables" "A" "PREROUTING" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "incoming"
+        setup_forwarding "iptables" "A" "PREROUTING" "hassio" "udp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "incoming"
+        setup_forwarding "iptables" "A" "PREROUTING" "hassio" "tcp" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${3}" "${2}" "incoming"
       fi
     fi
     if bashio::var.has_value "${tailscale_address_ipv6}"; then
-      setup_forwarding "ip6tables" "A" "OUTPUT" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "53" "${2}" "local"
-      setup_forwarding "ip6tables" "A" "OUTPUT" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "53" "${2}" "local"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "53" "${2}" "local"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "5553" "[${MAGIC_DNS_IPV6}]" "53" "${2}" "local"
       setup_accepting "ip6tables" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}"
       setup_accepting "ip6tables" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}"
-      setup_forwarding "ip6tables" "A" "OUTPUT" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "local"
-      setup_forwarding "ip6tables" "A" "OUTPUT" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "local"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "local"
+      setup_forwarding "ip6tables" "A" "OUTPUT" "" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "local"
       if bashio::var.true "${hassio_ipv6_enabled}"; then
-        setup_forwarding "ip6tables" "A" "PREROUTING" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "incoming"
-        setup_forwarding "ip6tables" "A" "PREROUTING" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "incoming"
+        setup_forwarding "ip6tables" "A" "PREROUTING" "hassio" "udp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "incoming"
+        setup_forwarding "ip6tables" "A" "PREROUTING" "hassio" "tcp" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[${tailscale_address_ipv6}]" "${3}" "${2}" "incoming"
       fi
     fi
     ;;
@@ -216,6 +206,14 @@ case "${1-}-${2-}" in
     remove_forwarding "ip6tables" "OUTPUT" "IPv6" "128" "${MAGIC_DNS_IPV6}" "53" "[::1]" "${2}" "local"
     ;;
   remove-forwarding)
+    # Load Tailscale's local IP addresses from cache
+    if ! tailscale_address_ipv4="$(<"${TAILSCALE_ADDRESS_IPV4_CACHE}")" || \
+      ! tailscale_address_ipv6="$(<"${TAILSCALE_ADDRESS_IPV6_CACHE}")" || \
+      ( bashio::var.is_empty "${tailscale_address_ipv4-}" && bashio::var.is_empty "${tailscale_address_ipv6-}" )
+    then
+      bashio::exit.nok "Failed to load cached tailscale addresses"
+    fi
+
     if bashio::var.has_value "${tailscale_address_ipv4}"; then
       remove_forwarding "iptables" "PREROUTING" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${2}" "incoming"
       remove_forwarding "iptables" "OUTPUT" "IPv4" "32" "${MAGIC_DNS_IPV4}" "53" "${tailscale_address_ipv4}" "${2}" "local"

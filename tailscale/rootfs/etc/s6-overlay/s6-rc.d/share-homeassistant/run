@@ -50,7 +50,8 @@ fi
 
 curl_options+=(-s)
 curl_options+=(-o/dev/null)
-curl_options+=(--connect-timeout 1)
+curl_options+=(--connect-timeout 0.5)
+curl_options+=(--max-time 0.5)
 curl_options+=(-w"%{http_code}")
 
 tailscale_options+=("$(bashio::config 'share_homeassistant')")

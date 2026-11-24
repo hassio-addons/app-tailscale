@@ -11,8 +11,8 @@ readonly NM_DISPATCHER_MONITOR_FIFODIR=/run/nm-dispatcher-monitor-fifodir
 
 declare ping_pid
 declare nm_dispatcher_action
-declare fifo
 declare readiness_reported=false
+declare fifo
 
 # use -p in case of the service is restarted
 mkdir -p "${NM_DISPATCHER_MONITOR_FIFODIR}"
@@ -46,10 +46,9 @@ do
   case "${nm_dispatcher_action}" in
     up|down|dhcp4-change|dhcp6-change|reapply)
       for fifo in "${NM_DISPATCHER_MONITOR_FIFODIR:?}/"*; do
-        if [[ -p "$fifo" ]] && ! echo "${nm_dispatcher_action}" > "${fifo}"; then
-          # To abort the pipeline from a subshell, we need to abort the leftmost command also
-          kill $(pgrep -f "^busctl.*?app.tailscale.nm_dispatcher.readiness'$") || true
-          bashio::exit.nok "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Halting app to prevent network loss."
+        if [[ -p "$fifo" ]] && ! echo "${nm_dispatcher_action}" | dd conv=nocreat oflag=nonblock of="${fifo}" &>/dev/null; then
+          # It's only a warning, the main cause can be a finish script removing the fifo after iterating the folder here
+          bashio::log.warning "Failed to send nm-dispatcher action '${nm_dispatcher_action}' to listener '${fifo}'. Probably the listener service is currently stopping."
         fi
       done
       ;;

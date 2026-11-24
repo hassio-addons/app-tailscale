@@ -79,6 +79,8 @@ do
         ! eval "bashio::api.supervisor GET /addons/self/options/config false &> /dev/null ${LOG_FD}> /dev/null"
       do
         if (( wait_counter++ == WAIT_COUNT )); then
+          # To abort the pipeline from a subshell, we need to abort the leftmost command also
+          kill $(pgrep -f "^busctl.*?app.tailscale.nm_dispatcher.readiness'$") || true
           bashio::exit.nok "Supervisor is unreachable. Halting app to prevent network loss."
         fi
         bashio::log.info "Waiting for the supervisor to be ready..."

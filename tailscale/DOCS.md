@@ -89,6 +89,8 @@ taildrive:
   share: false
   ssl: false
 taildrop: false
+tweaks:
+  force_noise_443: false
 userspace_networking: false
 ```
 
@@ -443,6 +445,26 @@ Tailscale devices.
 This option is disabled by default.
 
 Received files are stored in the `/share/taildrop` directory.
+
+### Option group `tweaks`
+
+Tweakable settings to eliminate specific issues.
+
+### Option: `tweaks.force_noise_443`
+
+When enabled forces the controlclient noise dialer to always use port 443 HTTPS
+connections to the controlplane and do not try the port 80 HTTP fast path.
+
+This option is disabled by default.
+
+Try to enable it only, when you experience temporary connection dropouts,
+usually within few minutes after app start that exists for approx. 15 minutes.
+During the dropout you can see repeating `map response long-poll timed out!` log
+entries and the device is shown as disconnected on the [Machines
+page][tailscale_machines] of the admin console. After the dropup you see
+`forcing port 443 dial due to recent noise dial` log entry, the app reconnects
+and remains connected. The root cause is unknown. In this case enabling this
+option can eliminate the temporary dropout.
 
 ### Option: `userspace_networking`
 

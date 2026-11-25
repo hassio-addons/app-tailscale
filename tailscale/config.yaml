@@ -66,6 +66,8 @@ options:
     share: false
     ssl: false
   taildrop: false
+  tweaks:
+    force_noise_443: false
   userspace_networking: false
 schema:
   accept_dns: bool
@@ -100,4 +102,6 @@ schema:
     share: bool
     ssl: bool
   taildrop: bool
+  tweaks:
+    force_noise_443: bool
   userspace_networking: bool

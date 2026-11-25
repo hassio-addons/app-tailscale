@@ -13,6 +13,7 @@ declare tags
 declare taildrive_addons taildrive_config
 declare share_service_name
 declare log_level log_suppression
+declare always_use_derp
 
 readonly MAGIC_DNS_IPV4="100.100.100.100"
 readonly MAGIC_DNS_IPV6="fd7a:115c:a1e0::53"
@@ -139,6 +140,18 @@ if bashio::var.has_value "${log_level}"; then
     bashio::log.info "Successfully migrated log_level option \"${log_level}\" to log_suppression \"${log_suppression}\""
     bashio::log.info 'Removing deprecated log_level option'
     bashio::app.option 'log_level'
+fi
+
+# Migrate always_use_derp to tweaks.always_use_derp
+always_use_derp=$(bashio::jq "${options}" '.always_use_derp | select(.!=null)')
+if bashio::var.has_value "${always_use_derp}"; then
+    bashio::try bashio::app.option 'tweaks.always_use_derp' "^${always_use_derp}"
+    if bashio::try.failed; then
+        bashio::log.warning "The always_use_derp option migration failed, always_use_derp option '${always_use_derp}' is dropped, using default disabled."
+    else
+        bashio::log.info "Successfully migrated always_use_derp option to tweaks.always_use_derp"
+    fi
+    bashio::app.option 'always_use_derp'
 fi
 
 # Check DNS configuration

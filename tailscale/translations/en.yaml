@@ -37,12 +37,6 @@ configuration:
     description: >-
       This option allows you to specify specific ACL tags for this
       Tailscale instance. They need to start with `tag:`.
-  always_use_derp:
-    name: Always use DERP connection
-    description: >-
-      When enabled forces all peer communication over DERP by disabling the use of
-      UDP.
-      This option is disabled by default.
   exit_node:
     name: Use exit node
     description: >-
@@ -151,6 +145,17 @@ configuration:
       This option allows you to enable Taildrop, a file sharing service
       that allows you to share files with other Tailscale nodes.
       This option is disabled by default.
+  tweaks:
+    name: Tweaks
+    description: >-
+      Tweakable settings to eliminate specific issues.
+    fields:
+      always_use_derp:
+        name: Always use DERP connection
+        description: >-
+          When enabled forces all peer communication over DERP by disabling the use of
+          UDP.
+          This option is disabled by default.
   userspace_networking:
     name: Userspace networking mode
     description: >-

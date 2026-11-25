@@ -48,7 +48,6 @@ options:
   advertise_exit_node: false
   advertise_routes: []
   advertise_tags: []
-  always_use_derp: false
   log_suppression: true
   log_upload: false
   login_server: "https://controlplane.tailscale.com"
@@ -66,6 +65,8 @@ options:
     share: false
     ssl: false
   taildrop: false
+  tweaks:
+    always_use_derp: false
   userspace_networking: false
 schema:
   accept_dns: bool
@@ -76,7 +77,6 @@ schema:
     - "match(^(?:local_subnets|(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\/(?:3[0-2]|[12]?\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+\\/(?:12[0-8]|(?:1[01]|[1-9]?)\\d))$)"
   advertise_tags:
     - "match(^tag:[a-zA-Z][a-zA-Z0-9-]*$)"
-  always_use_derp: bool
   exit_node: "match(^(?:(?:(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)\\.){3}(?:25[0-5]|(?:2[0-4]|1\\d|[1-9]?)\\d)|[a-fA-F\\d.:]+:[a-fA-F\\d.:]+|[a-fA-F\\d]{8}(?:-[a-fA-F\\d]{4}){3}-[a-fA-F\\d]{12}|auto:any)$)?"
   log_suppression: bool
   log_upload: bool
@@ -100,4 +100,6 @@ schema:
     share: bool
     ssl: bool
   taildrop: bool
+  tweaks:
+    always_use_derp: bool
   userspace_networking: bool

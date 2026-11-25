@@ -31,7 +31,7 @@ if bashio::config.true "userspace_networking"; then
 fi
 
 # If always_use_derp enabled, set TS_DEBUG_ALWAYS_USE_DERP=true
-if bashio::config.true "always_use_derp"; then
+if bashio::config.true "tweaks.always_use_derp"; then
   export TS_DEBUG_ALWAYS_USE_DERP=true
   bashio::log.notice "You have enabled always_use_derp, all traffic will be routed via DERP servers"
 fi

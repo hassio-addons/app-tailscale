@@ -151,6 +151,17 @@ configuration:
       This option allows you to enable Taildrop, a file sharing service
       that allows you to share files with other Tailscale nodes.
       This option is disabled by default.
+  tweaks:
+    name: Tweaks
+    description: >-
+      Tweakable settings to eliminate specific issues.
+    fields:
+      force_noise_443:
+        name: Force noise control traffic over port 443
+        description: >-
+          When enabled forces the controlclient noise dialer to always use port 443 HTTPS
+          connections to the controlplane and do not try the port 80 HTTP fast path.
+          This option is disabled by default.
   userspace_networking:
     name: Userspace networking mode
     description: >-

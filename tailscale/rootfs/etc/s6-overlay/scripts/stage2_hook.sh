@@ -199,11 +199,6 @@ then
     rm /etc/s6-overlay/s6-rc.d/post-tailscaled/dependencies.d/protect-subnets
 fi
 
-# If local subnets are not configured in advertise_routes, do not wait for the local network to be ready to collect subnet information
-if ! bashio::config "advertise_routes" | grep -Fxq "local_subnets"; then
-    rm /etc/s6-overlay/s6-rc.d/post-tailscaled/dependencies.d/local-network
-fi
-
 # Disable forwarding service when userspace-networking is enabled
 if bashio::config.true "userspace_networking"; then
     rm /etc/s6-overlay/user-bundles.d/user/contents.d/forwarding

@@ -463,8 +463,8 @@ During the dropout you can see repeating `map response long-poll timed out!` log
 entries and the device is shown as disconnected on the [Machines
 page][tailscale_machines] of the admin console. After the dropup you see
 `forcing port 443 dial due to recent noise dial` log entry, the app reconnects
-and remains connected. The root cause is unknown. In this case enabling this
-option can eliminate the temporary dropout.
+and usually remains connected, though not always. The root cause is unknown. In
+this case enabling this option can eliminate the temporary dropout.
 
 ### Option: `userspace_networking`
 

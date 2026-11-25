@@ -525,6 +525,12 @@ More information: [What is 100.100.100.100][tailscale_info_quad100],
    additional and queried before the DNS servers specified in Network settings
    above. This configuration is persistent, you have to execute it only once._
 
+   **Note:** _In case of an IPv6-only tailnet, Home Assistant's internal DNS
+   server can't access the IPv6 address of MagicDNS, because it is IPv4-only. In
+   this case install an IPv4 accessible DNS proxy app that can forward DNS
+   queries to MagicDNS's IPv6 address, and configure it's IPv4 address for Home
+   Assistant's internal DNS server._
+
 **Note:** The only difference compared to the general Tailscale experience, is
 that you always have to use the fully qualified domain name instead of only the
 device name, i.e. `ping some-tailnet-device.tail1234.ts.net` works, but `ping

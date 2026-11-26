@@ -344,9 +344,9 @@ Port 443 is used by default.
 
 ### Option: `services`
 
-This option allows you to advertise other local services running on this device
-as Tailscale Services. Each service needs a name, a local target address,
-furthermore a protocol, and a port to expose it on.
+This option allows you to advertise services running on this device or on other
+devices on your network as Tailscale Services. Each service needs a name, a
+target address, a protocol, and a port to expose it on.
 
 This option is disabled by default.
 
@@ -359,10 +359,12 @@ name.
 
 - The service `name` must include the `svc:` prefix.
 
-- The `target` must be a local address reachable from this app. Use `http://`,
+- The `target` must be reachable from this app and include a port. The host can
+  be an IPv4 address, a bracketed IPv6 address or a DNS hostname. Use `http://`,
   `https://` or `https+insecure://` targets for HTTP/HTTPS protocols, and
   `tcp://` targets for TCP and tls-terminated-tcp protocols, for example
-  `http://127.0.0.1:13378`.
+  `http://127.0.0.1:13378`, `http://192.168.1.100:8080` or
+  `http://[fd00::1]:8080`.
 
 - Supported protocols by which the target will be presented:
 
